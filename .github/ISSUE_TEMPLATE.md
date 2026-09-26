@@ -11,7 +11,7 @@ Brief description of the issue or feature request.
 ## Environment (if bug)
 
 - React version:
-- m2rf version:
+- m2rd version:
 - Browser (if applicable):
 - Operating system:
 

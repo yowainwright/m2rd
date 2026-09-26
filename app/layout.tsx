@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'm2rf',
-  description: 'CRUD Mermaid input into React Flow graph output.',
-  alternates: { canonical: 'https://jeffry.in/m2rf/' },
+  title: 'm2rd',
+  description: 'Mermaid to React Diagrams — a local-first Mermaid diagram editor.',
+  alternates: { canonical: 'https://jeffry.in/m2rd/' },
 };
 
 export default function RootLayout({

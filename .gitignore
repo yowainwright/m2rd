@@ -141,5 +141,5 @@ tmp
 .node-version
 .pnpm-store/
 .agents/
-.chrome-m2rf-debug/
+.chrome-*-debug/
 .claude

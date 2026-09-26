@@ -428,7 +428,7 @@ describe('graphRepository', () => {
     const first = await createFiveVersions();
     const id = first.workspace.id;
     await saveVersion(id, 'version 6');
-    const database = await new Dexie('m2rf-studio').open();
+    const database = await new Dexie('m2rd').open();
     try {
       expect(await database.table('inputs').count()).toBe(5);
       expect(await database.table('translations').count()).toBe(5);

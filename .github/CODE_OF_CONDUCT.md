@@ -1,6 +1,6 @@
 # Code Of Conduct
 
-Participation in m2rf spaces should stay focused, respectful, and useful.
+Participation in m2rd spaces should stay focused, respectful, and useful.
 
 Unacceptable behavior includes harassment, personal attacks, publishing private information without permission, sexualized language or imagery, and conduct that makes collaboration unsafe or unproductive.
 

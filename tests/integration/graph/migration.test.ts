@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 import { APP_INITIAL_CONTEXT } from '@/app/constants';
 
 it('preserves an existing version-1 database and appends its next save', async () => {
-  const legacy = new Dexie('m2rf-studio');
+  const legacy = new Dexie('m2rd');
   legacy.version(1).stores({
     inputs: 'id, workspaceId, updatedAt',
     translations: 'id, inputId, updatedAt',

@@ -147,7 +147,7 @@ const createDefaultCanvasSettings = (): GraphCanvasSettings =>
 export const renderWorkspace = (context: AppContext) =>
   Effect.tryPromise({
     try: async () => {
-      const id = `m2rf-${crypto.randomUUID()}`;
+      const id = `m2rd-${crypto.randomUUID()}`;
       const parsed = await mermaid.parse(context.input.source);
       const detectedType = getSupportedDiagramType(parsed.diagramType);
       const nativeRenderer = {
@@ -384,7 +384,7 @@ export const handleReactFlowError = (code: string, message: string) => {
 
 export const logAppEvent = (name: string, payload: Record<string, unknown> = {}) => {
   const eventPayload = Object.assign({}, payload, { event: name });
-  browserLogger.debug(eventPayload, 'm2rf app event');
+  browserLogger.debug(eventPayload, 'm2rd app event');
 };
 
 export const getSelectionLabel = (nodeCount: number, edgeCount: number) => {

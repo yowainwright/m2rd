@@ -11,8 +11,7 @@ import type {
   NodeSurface,
 } from './types';
 
-// Keep the legacy storage name so existing browser-local graphs remain accessible.
-export const GRAPH_DATABASE_NAME = 'm2rf-studio';
+export const GRAPH_DATABASE_NAME = 'm2rd';
 export const GRAPH_DATABASE_VERSION = 2;
 export const GRAPH_VERSION_LIMIT = 5;
 export const UNTITLED_GRAPH_NAME = 'Untitled graph';

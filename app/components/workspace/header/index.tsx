@@ -150,7 +150,7 @@ function HeaderBrand() {
               rel="noreferrer"
             >
               <Image
-                src="/m2rf/github.svg"
+                src="/m2rd/github.svg"
                 alt=""
                 width={16}
                 height={16}

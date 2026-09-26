@@ -34,13 +34,13 @@ const SEQUENCE_NODE_KINDS = new Set([
   'sequence-note',
   'sequence-participant',
 ]);
-const NODE_COLOR_VARIABLE = '--m2rf-node-primary';
-const NODE_SURFACE_VARIABLE = '--m2rf-node-surface';
-const NODE_GRADIENT_A_VARIABLE = '--m2rf-node-gradient-a';
-const NODE_GRADIENT_B_VARIABLE = '--m2rf-node-gradient-b';
-const NODE_GRADIENT_DIRECTION_VARIABLE = '--m2rf-node-gradient-direction';
-const NODE_GRADIENT_SPLIT_VARIABLE = '--m2rf-node-gradient-split';
-const NODE_SHAPE_VARIABLE = '--m2rf-node-shape';
+const NODE_COLOR_VARIABLE = '--m2rd-node-primary';
+const NODE_SURFACE_VARIABLE = '--m2rd-node-surface';
+const NODE_GRADIENT_A_VARIABLE = '--m2rd-node-gradient-a';
+const NODE_GRADIENT_B_VARIABLE = '--m2rd-node-gradient-b';
+const NODE_GRADIENT_DIRECTION_VARIABLE = '--m2rd-node-gradient-direction';
+const NODE_GRADIENT_SPLIT_VARIABLE = '--m2rd-node-gradient-split';
+const NODE_SHAPE_VARIABLE = '--m2rd-node-shape';
 const NODE_SHAPE_STYLE_KEYS = [
   'aspectRatio',
   'borderRadius',

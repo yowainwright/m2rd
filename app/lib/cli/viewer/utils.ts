@@ -101,7 +101,7 @@ export const terminalInput = Effect.acquireRelease(
   Effect.try({
     try: openTerminal,
     catch: () =>
-      'An interactive terminal is required. Run m2rf from a terminal with keyboard access.',
+      'An interactive terminal is required. Run m2rd from a terminal with keyboard access.',
   }),
   ({ stream, owned }) =>
     Effect.sync(() => {
