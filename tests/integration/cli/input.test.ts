@@ -1,8 +1,9 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { Effect } from 'effect';
+import { JSDOM } from 'jsdom';
 import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { runCli } from '@/app/lib/cli';
 import { showViewer } from '@/app/lib/cli/viewer';
@@ -65,5 +66,31 @@ test('requires input when launched from a terminal without a file', async () => 
 test('reports a missing input file without opening the viewer', async () => {
   const missing = resolve(directory, 'missing.mmd');
   await expect(Effect.runPromise(runCli(missing, options))).rejects.toThrow('ENOENT');
+  expect(showViewer).not.toHaveBeenCalled();
+});
+
+test.each(['file', 'stdin'])(
+  'exports SVG from %s without opening the terminal viewer',
+  async (input) => {
+    const output = resolve(directory, `${input}.svg`);
+    writeFileSync(path, source);
+    const inputPath = input === 'file' ? path : undefined;
+    if (input === 'stdin') stdin([source]);
+    const exporting = Object.assign({}, options, { output });
+    await Effect.runPromise(runCli(inputPath, exporting));
+    const image = new JSDOM(readFileSync(output, 'utf8'), { contentType: 'image/svg+xml' });
+    expect(image.window.document.documentElement.localName).toBe('svg');
+    expect(image.window.document.documentElement.textContent).toContain('Read input');
+    image.window.close();
+    expect(showViewer).not.toHaveBeenCalled();
+  },
+);
+
+test('does not create an SVG file when piped input is malformed', async () => {
+  const output = resolve(directory, 'invalid.svg');
+  stdin(['flowchart TD\n A[unterminated']);
+  const exporting = Object.assign({}, options, { output });
+  await expect(Effect.runPromise(runCli(undefined, exporting))).rejects.toThrow();
+  expect(existsSync(output)).toBe(false);
   expect(showViewer).not.toHaveBeenCalled();
 });

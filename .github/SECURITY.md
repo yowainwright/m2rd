@@ -14,7 +14,7 @@ Please do not open a public issue for suspected vulnerabilities.
 
 Use GitHub private vulnerability reporting when available:
 
-<https://github.com/yowainwright/m2rf/security/advisories/new>
+<https://github.com/yowainwright/m2rd/security/advisories/new>
 
 If private reporting is unavailable, email the maintainer listed in `package.json`.
 

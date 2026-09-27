@@ -1,6 +1,7 @@
 export interface CliOptions {
   ascii: boolean;
   width: number;
+  output?: string;
 }
 
 export interface RenderedMermaid {

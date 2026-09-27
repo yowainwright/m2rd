@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yowainwright/m2rf"
+    "url": "https://github.com/yowainwright/m2rd"
   },
   "type": "module",
   "packageManager": "pnpm@12.2.1",
@@ -20,6 +20,7 @@
   },
   "scripts": {
     "cli": "node tmp/cli/m2rd-cli.mjs",
+    "preview:styleguide": "pnpm run cli:build && node tmp/cli/m2rd-cli.mjs --styleguide",
     "cli:build": "rolldown app/lib/cli/bin.ts --dir tmp/cli --entryFileNames m2rd-cli.mjs --chunkFileNames '[name]-[hash].mjs' --platform node --format esm -e ink -e react -e react/jsx-runtime -e effect -e mermaid -e svgdom -e jsdom -e dompurify -e elkjs/lib/elk.bundled.js -e string-width -e xstate -e @xstate/react",
     "cli:typecheck": "tsc --project tsconfig.cli.json",
     "dev": "printf '\\n  App: http://localhost:%s/m2rd/\\n\\n' \"${M2RD_APP_PORT:-54783}\" && next dev --port ${M2RD_APP_PORT:-54783}",

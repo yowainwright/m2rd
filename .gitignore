@@ -135,6 +135,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 tmp
+
+m2rd-styleguide.svg
+
 .claude/settings.json
 
 # Local agent and package-manager state

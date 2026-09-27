@@ -3,7 +3,7 @@ import { Text, renderToString } from 'ink';
 import { Effect } from 'effect';
 import { Panel } from '@/app/components/ui/panel';
 import { DEFAULT_WIDTH, MAX_WIDTH, MIN_WIDTH } from './constants';
-import { cleanText, readInput, renderMermaid } from './utils';
+import { cleanText, exportSvg, readInput, renderMermaid } from './utils';
 import { renderFlowchart } from './renders/flowchart';
 import { renderSequence } from './renders/sequence';
 import { renderState } from './renders/state';
@@ -19,11 +19,15 @@ export const renderDiagram = (source: string, options: CliOptions) =>
     }),
   );
 
-export const runCli = (path: string | undefined, options: CliOptions) =>
-  readInput(path).pipe(
-    Effect.flatMap((source) => renderDiagram(source, options)),
+const presentDiagram = (source: string, options: CliOptions) => {
+  if (options.output) return exportSvg(source, options.output);
+  return renderDiagram(source, options).pipe(
     Effect.flatMap((diagram) => showViewer(diagram, options.ascii)),
   );
+};
+
+export const runCli = (path: string | undefined, options: CliOptions) =>
+  readInput(path).pipe(Effect.flatMap((source) => presentDiagram(source, options)));
 
 export const formatError = (message: string) => {
   const width = Math.max(MIN_WIDTH, Math.min(process.stderr.columns || DEFAULT_WIDTH, MAX_WIDTH));

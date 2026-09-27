@@ -1,12 +1,14 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { stripVTControlCharacters } from 'node:util';
 import { Effect } from 'effect';
 import createDOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 import { createHTMLWindow } from 'svgdom';
 import mermaid from 'mermaid';
+import type { MermaidConfig } from 'mermaid';
 import mermaidMetadata from 'mermaid/package.json' with { type: 'json' };
 import { MERMAID_RENDER_ID } from './constants';
+import { svgTheme } from './themes/mermaid/constants';
 import type { RenderedMermaid } from './types';
 
 export const cleanText = (value: string) => {
@@ -24,7 +26,7 @@ export const errorMessage = (cause: unknown): string => {
 
 // https://github.com/mermaid-js/mermaid/issues/6634
 // https://github.com/tani/isomorphic-mermaid/issues/5
-const initializeMermaid = () => {
+const initializeMermaid = (config: MermaidConfig = {}) => {
   const sanitizingWindow = new JSDOM('').window;
   Object.assign(createDOMPurify, createDOMPurify(sanitizingWindow));
   const window = createHTMLWindow();
@@ -33,13 +35,15 @@ const initializeMermaid = () => {
   const document = window.document;
   const CSSStyleSheet = sanitizingWindow.CSSStyleSheet;
   Object.assign(globalThis, { window, document, CSSStyleSheet });
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'strict',
-    htmlLabels: false,
-    flowchart: { htmlLabels: false },
-    suppressErrorRendering: true,
-  });
+  mermaid.initialize(
+    Object.assign({}, config, {
+      startOnLoad: false,
+      securityLevel: 'strict',
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
+      suppressErrorRendering: true,
+    }),
+  );
   return sanitizingWindow;
 };
 
@@ -112,6 +116,43 @@ const renderMermaidSource = async (source: string): Promise<RenderedMermaid> => 
 
 export const renderMermaid = (source: string) =>
   Effect.tryPromise({ try: () => renderMermaidSource(source), catch: errorMessage });
+
+// SVGDOM lacks parentElement, which Mermaid's Gantt renderer reads for sizing.
+// https://dom.spec.whatwg.org/#dom-node-parentelement
+const enableParentElement = () => {
+  const NodeConstructor: typeof Node = Reflect.get(window, 'Node');
+  const prototype = NodeConstructor.prototype;
+  if ('parentElement' in prototype) return;
+  Object.defineProperty(prototype, 'parentElement', {
+    configurable: true,
+    get(this: Element) {
+      const parent = this.parentNode;
+      if (parent?.nodeType === 1) return parent;
+      return null;
+    },
+  });
+};
+
+const renderSvgSource = async (source: string) => {
+  const sanitizingWindow = initializeMermaid(svgTheme);
+  try {
+    enableParentElement();
+    const rendered = await mermaid.render('m2rd-image', source);
+    return rendered.svg;
+  } finally {
+    sanitizingWindow.close();
+  }
+};
+
+export const exportSvg = (source: string, output: string) =>
+  Effect.tryPromise({ try: () => renderSvgSource(source), catch: errorMessage }).pipe(
+    Effect.flatMap((svg) =>
+      Effect.tryPromise({
+        try: () => writeFile(output, svg, { encoding: 'utf8', flag: 'wx' }),
+        catch: errorMessage,
+      }),
+    ),
+  );
 
 const readStdin = async () => {
   process.stdin.setEncoding('utf8');
