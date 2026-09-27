@@ -3,7 +3,7 @@ import { Schema } from 'effect';
 export const STATE_NODE_TYPE = 'stateNode';
 export const STATE_EDGE_TYPE = 'stateTransition';
 export const STATE_COMPATIBILITY_ERROR =
-  'Mermaid state diagram data is incompatible with this version of m2rf.';
+  'Mermaid state diagram data is incompatible with this version of m2rd.';
 export const STATE_SHAPES = [
   'rect',
   'roundedRect',

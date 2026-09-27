@@ -1,6 +1,6 @@
-# Contributing to m2rf
+# Contributing to m2rd
 
-Thanks for your interest in contributing to m2rf.
+Thanks for your interest in contributing to m2rd.
 
 ## Development Setup
 
@@ -52,7 +52,7 @@ files in `tests/e2e/` for browser journeys.
 When reporting issues, please include:
 
 - React version
-- m2rf version
+- m2rd version
 - Browser (if applicable)
 - Minimal reproduction case
 - Error messages and stack traces

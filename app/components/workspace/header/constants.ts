@@ -6,7 +6,7 @@ export const SAVE_SHORTCUT_LABEL = '⌃s / ⌘s';
 export const SAVE_KEY_SHORTCUTS = 'Control+s Meta+s';
 
 export const HEADER_LABELS = {
-  title: 'm2rf',
+  title: 'm2rd',
   sidebar: 'Toggle saved graphs',
   repository: 'GitHub repository',
   create: 'New',

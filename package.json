@@ -1,8 +1,8 @@
 {
-  "name": "m2rf",
+  "name": "m2rd",
   "version": "0.0.9",
   "private": true,
-  "description": "The m2rf Mermaid diagram editor",
+  "description": "m2rd — Mermaid to React Diagrams",
   "author": "Jeff Wainwright <me@jeffry.in> (https://jeffry.in)",
   "license": "MIT",
   "repository": {
@@ -19,12 +19,12 @@
     }
   },
   "scripts": {
-    "cli": "node tmp/cli/m2rf-cli.mjs",
-    "cli:build": "rolldown app/lib/cli/bin.ts --dir tmp/cli --entryFileNames m2rf-cli.mjs --chunkFileNames '[name]-[hash].mjs' --platform node --format esm -e ink -e react -e react/jsx-runtime -e effect -e mermaid -e svgdom -e jsdom -e dompurify -e elkjs/lib/elk.bundled.js -e string-width -e xstate -e @xstate/react",
+    "cli": "node tmp/cli/m2rd-cli.mjs",
+    "cli:build": "rolldown app/lib/cli/bin.ts --dir tmp/cli --entryFileNames m2rd-cli.mjs --chunkFileNames '[name]-[hash].mjs' --platform node --format esm -e ink -e react -e react/jsx-runtime -e effect -e mermaid -e svgdom -e jsdom -e dompurify -e elkjs/lib/elk.bundled.js -e string-width -e xstate -e @xstate/react",
     "cli:typecheck": "tsc --project tsconfig.cli.json",
-    "dev": "printf '\\n  App: http://localhost:%s/m2rf/\\n\\n' \"${M2RF_APP_PORT:-54783}\" && next dev --port ${M2RF_APP_PORT:-54783}",
+    "dev": "printf '\\n  App: http://localhost:%s/m2rd/\\n\\n' \"${M2RD_APP_PORT:-54783}\" && next dev --port ${M2RD_APP_PORT:-54783}",
     "build": "next build --webpack",
-    "preview": "mkdir -p .next/cache/pages && ln -sfn ../../../out .next/cache/pages/m2rf && python3 -m http.server ${M2RF_PREVIEW_PORT:-54784} --bind 127.0.0.1 --directory .next/cache/pages",
+    "preview": "mkdir -p .next/cache/pages && ln -sfn ../../../out .next/cache/pages/m2rd && python3 -m http.server ${M2RD_PREVIEW_PORT:-54784} --bind 127.0.0.1 --directory .next/cache/pages",
     "release": "release-it patch",
     "release:dry": "release-it patch --dry-run",
     "deps:check": "codependence",
@@ -175,7 +175,7 @@
     "appendix": {
       "lodash-es@4.18.1": {
         "dependents": {
-          "m2rf": "lodash-es (required by @chevrotain/cst-dts-gen, @chevrotain/gast, chevrotain)"
+          "m2rd": "lodash-es (required by @chevrotain/cst-dts-gen, @chevrotain/gast, chevrotain)"
         },
         "ledger": {
           "addedDate": "2026-09-15T21:47:22.982Z",

@@ -38,7 +38,7 @@ const shouldExportNode = (node: Node) => {
     return true;
   }
 
-  return node.closest('[data-m2rf-export-ignore="true"]') === null;
+  return node.closest('[data-m2rd-export-ignore="true"]') === null;
 };
 
 const downloadDataUrl = (dataUrl: string, fileName: string) => {

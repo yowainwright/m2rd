@@ -1,6 +1,6 @@
-# m2rf
+# m2rd
 
-m2rf is a local-first Mermaid diagram editor. Mermaid is the source of truth; React Flow is the interactive view.
+m2rd (Mermaid to React Diagrams) is a local-first Mermaid diagram editor. Mermaid is the source of truth; React Flow is the interactive view.
 
 ## Run locally
 
@@ -9,14 +9,14 @@ pnpm install --frozen-lockfile
 pnpm run dev
 ```
 
-Open [http://localhost:54783/m2rf/](http://localhost:54783/m2rf/). Set `M2RF_APP_PORT` to use another port.
+Open [http://localhost:54783/m2rd/](http://localhost:54783/m2rd/). Set `M2RD_APP_PORT` to use another port.
 
 ## Terminal preview
 
 ```sh
 pnpm run cli:build
-node tmp/cli/m2rf-cli.mjs diagram.mmd
-cat diagram.mmd | node tmp/cli/m2rf-cli.mjs
+node tmp/cli/m2rd-cli.mjs diagram.mmd
+cat diagram.mmd | node tmp/cli/m2rd-cli.mjs
 ```
 
 Flowchart, sequence, and state previews open an interactive viewer. Use arrow keys or `h/j/k/l` to scroll, Page Up/Down to page, and `q` or Ctrl+C to quit. Resizing changes the visible area without rearranging the diagram. File input and piped input both require an interactive terminal.

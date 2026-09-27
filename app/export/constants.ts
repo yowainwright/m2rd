@@ -8,4 +8,4 @@ export const GIF_REPEAT_ONCE = -1;
 export const GIF_TYPE = 'image/gif';
 export const PNG_FILE_EXTENSION = 'png';
 export const SVG_FILE_EXTENSION = 'svg';
-export const SVG_FILE_FALLBACK_NAME = 'm2rf-graph';
+export const SVG_FILE_FALLBACK_NAME = 'm2rd-graph';

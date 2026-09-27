@@ -177,8 +177,8 @@ function WorkspaceSidebarHeader() {
     <SidebarHeader className="min-h-12 border-b px-4 py-2">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold">m2rf</p>
-          <p className="text-[10px] leading-3 text-muted-foreground">mermaid to react flow</p>
+          <p className="text-sm font-semibold">m2rd</p>
+          <p className="text-[10px] leading-3 text-muted-foreground">mermaid to react diagrams</p>
         </div>
         <CloseSidebarButton />
       </div>
@@ -254,7 +254,7 @@ function WorkspaceCredits() {
           rel="noreferrer"
           className="hover:underline focus-visible:underline"
         >
-          m2rf
+          m2rd
         </a>{' '}
         {FOOTER_SUPPORTED_DIAGRAMS}
       </p>

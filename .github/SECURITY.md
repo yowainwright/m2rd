@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-m2rf is pre-1.0. Security fixes are prioritized for the latest main branch and latest published site build.
+m2rd is pre-1.0. Security fixes are prioritized for the latest main branch and latest published site build.
 
 | Version | Supported |
 | ------- | --------- |

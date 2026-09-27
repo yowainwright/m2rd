@@ -4,8 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
 const root = resolve(import.meta.dirname, '..');
 const outputDir = resolve(root, '.next/cache/playwright');
 const testDir = resolve(root, 'tests/e2e');
-const port = process.env.M2RF_PREVIEW_PORT || '54784';
-const baseURL = `http://127.0.0.1:${port}/m2rf/`;
+const port = process.env.M2RD_PREVIEW_PORT || '54784';
+const baseURL = `http://127.0.0.1:${port}/m2rd/`;
 const chromium = devices['Desktop Chrome'];
 
 export default defineConfig({

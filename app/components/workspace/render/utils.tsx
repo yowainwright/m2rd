@@ -171,7 +171,7 @@ function SelectedNodeIndicator({ selectedNodeId }: Pick<GraphCanvasProps, 'selec
     >
       <div
         className="rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-sm"
-        data-m2rf-export-ignore="true"
+        data-m2rd-export-ignore="true"
       >
         {RENDER_LABELS.nodeSelected}
       </div>
@@ -194,7 +194,7 @@ function SelectedEdgeIndicator({
       <div className="nodrag nopan absolute" style={selectedEdgeStyle}>
         <div
           className="rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-sm"
-          data-m2rf-export-ignore="true"
+          data-m2rd-export-ignore="true"
         >
           {RENDER_LABELS.edgeSelected}
         </div>

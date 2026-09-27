@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-test('loads the exported app and its assets under /m2rf/', async ({ page }) => {
+test('loads the exported app and its assets under /m2rd/', async ({ page }) => {
   const response = await page.goto('./');
   expect(response?.status()).toBe(200);
   await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'https://jeffry.in/m2rf/',
+    'https://jeffry.in/m2rd/',
   );
   const icon = page.getByRole('link', { name: 'GitHub repository' }).locator('img');
-  await expect(icon).toHaveAttribute('src', '/m2rf/github.svg');
+  await expect(icon).toHaveAttribute('src', '/m2rd/github.svg');
   expect(await icon.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   const assets = await page
     .locator('script[src], link[rel="stylesheet"]')
@@ -17,7 +17,7 @@ test('loads the exported app and its assets under /m2rf/', async ({ page }) => {
       elements.map((element) => element.getAttribute('src') || element.getAttribute('href')),
     );
   expect(assets.length).toBeGreaterThan(0);
-  expect(assets.every((path) => path?.startsWith('/m2rf/_next/'))).toBe(true);
+  expect(assets.every((path) => path?.startsWith('/m2rd/_next/'))).toBe(true);
   await page.reload();
   await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
   expect(await page.pageErrors()).toEqual([]);

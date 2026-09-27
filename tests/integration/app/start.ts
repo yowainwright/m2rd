@@ -48,7 +48,7 @@ describe('app startup', () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(layoutRect);
     render(createElement(Home));
 
-    expect(screen.getByRole('heading', { name: 'm2rf' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'm2rd' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Mermaid input' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'React Flow output' })).toBeTruthy();
   });

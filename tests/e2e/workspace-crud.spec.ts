@@ -228,7 +228,7 @@ const createScrollableGraphList = async (page: Page) => {
       const graphButtons = navigation.locator('[data-sidebar="menu-button"]');
       await expect(graphButtons).toHaveCount(12);
       await expectThreeCreditLines(footer);
-      await footer.getByRole('link', { name: 'm2rf', exact: true }).click({ trial: true });
+      await footer.getByRole('link', { name: 'm2rd', exact: true }).click({ trial: true });
       const footerBefore = await getBounds(footer);
       const sidebarBounds = await getBounds(sidebar);
       const sidebarInnerWidth = await sidebar.evaluate((element) => element.clientWidth);
@@ -274,7 +274,7 @@ test('shows minimal navigation with tooltips and OSS credits', async ({ page }, 
   expect(
     classes.every((value) => !value.includes('bg-background') && value.includes('h-7 w-7')),
   ).toBe(true);
-  await expect(header.getByRole('heading', { name: 'm2rf', exact: true })).toBeVisible();
+  await expect(header.getByRole('heading', { name: 'm2rd', exact: true })).toBeVisible();
 
   const create = header.getByRole('button', { name: 'New', exact: true });
   const sidebarTrigger = header.getByRole('button', { name: 'Toggle Sidebar' });
@@ -298,17 +298,17 @@ test('shows minimal navigation with tooltips and OSS credits', async ({ page }, 
 
   const sidebar = page.locator('[data-sidebar="sidebar"]');
   await expect(
-    sidebar.locator('[data-sidebar="header"]').getByText('m2rf', { exact: true }),
+    sidebar.locator('[data-sidebar="header"]').getByText('m2rd', { exact: true }),
   ).toBeVisible();
   await expect(sidebar.getByRole('heading', { name: 'Saved graphs', exact: true })).toBeVisible();
   const footer = sidebar.locator('[data-sidebar="footer"]');
-  await expect(footer.getByRole('link', { name: 'm2rf', exact: true })).toHaveAttribute(
+  await expect(footer.getByRole('link', { name: 'm2rd', exact: true })).toHaveAttribute(
     'href',
     repository.url,
   );
   await expect(
     footer.getByText(
-      'm2rf currently supports flow, sequence, state, class, ER, and Gantt diagrams; more soon! made with:',
+      'm2rd currently supports flow, sequence, state, class, ER, and Gantt diagrams; more soon! made with:',
       { exact: true },
     ),
   ).toBeVisible();
@@ -432,12 +432,12 @@ test('restores the last confirmed title on blur without adding a diagram version
   const history = page.getByRole('region', { name: 'Version history' });
   const previousName = await title.innerText();
   await title.click();
-  await page.getByRole('heading', { name: 'm2rf', exact: true }).click();
+  await page.getByRole('heading', { name: 'm2rd', exact: true }).click();
   await expect(title).toHaveText(previousName);
   await renameGraph(page, 'Road map');
   await title.click();
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).fill('');
-  await page.getByRole('heading', { name: 'm2rf', exact: true }).click();
+  await page.getByRole('heading', { name: 'm2rd', exact: true }).click();
   await expect(title).toHaveText('Road map');
   await expect(page.getByRole('textbox', { name: 'Graph name', exact: true })).toHaveCount(0);
   await expect(page.getByRole('alert').filter({ hasText: 'Enter a graph name.' })).toHaveCount(0);
@@ -688,7 +688,7 @@ test('loads legacy marker colors, oversized edges, and untitled names', async ({
   await page.evaluate(
     () =>
       new Promise<void>((resolve, reject) => {
-        const request = indexedDB.open('m2rf-studio');
+        const request = indexedDB.open('m2rd');
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
           const database = request.result;
@@ -980,7 +980,7 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
     .toContainEqual(
       expect.objectContaining({
         event: 'input.update',
-        msg: 'm2rf app event',
+        msg: 'm2rd app event',
         source: '[REDACTED]',
       }),
     );
@@ -1022,7 +1022,7 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
 
   const svg = await readFile(outputPath, 'utf8');
 
-  expect(download.suggestedFilename()).toBe('m2rf-graph.svg');
+  expect(download.suggestedFilename()).toBe('m2rd-graph.svg');
   expect(svg).toContain('<svg');
   expect(svg).toContain('Write Mermaid');
   expect(svg).toContain('rgb(239, 68, 68)');
@@ -1039,7 +1039,7 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
   const png = await readFile(pngOutputPath);
   const pngSignature = Array.from(png.subarray(0, 4));
 
-  expect(pngDownload.suggestedFilename()).toBe('m2rf-graph.png');
+  expect(pngDownload.suggestedFilename()).toBe('m2rd-graph.png');
   expect(pngSignature).toEqual([0x89, 0x50, 0x4e, 0x47]);
 
   const gifDownloadPromise = page.waitForEvent('download');
@@ -1053,7 +1053,7 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
 
   const gif = await readFile(gifOutputPath);
 
-  expect(gifDownload.suggestedFilename()).toBe('m2rf-graph.gif');
+  expect(gifDownload.suggestedFilename()).toBe('m2rd-graph.gif');
   expect(gif.subarray(0, 6).toString('ascii')).toBe('GIF89a');
   expect(gif.toString('latin1')).toContain('NETSCAPE2.0');
 
@@ -1068,7 +1068,7 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
 
   const onceGif = await readFile(onceOutputPath);
 
-  expect(onceDownload.suggestedFilename()).toBe('m2rf-graph.gif');
+  expect(onceDownload.suggestedFilename()).toBe('m2rd-graph.gif');
   expect(onceGif.subarray(0, 6).toString('ascii')).toBe('GIF89a');
   expect(onceGif.toString('latin1')).not.toContain('NETSCAPE2.0');
 });

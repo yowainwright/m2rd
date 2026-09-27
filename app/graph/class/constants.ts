@@ -4,7 +4,7 @@ import { StatePointSchema } from '../state/constants';
 export const CLASS_NODE_TYPE = 'classNode';
 export const CLASS_EDGE_TYPE = 'classRelation';
 export const CLASS_COMPATIBILITY_ERROR =
-  'Mermaid class diagram data is incompatible with this version of m2rf.';
+  'Mermaid class diagram data is incompatible with this version of m2rd.';
 export const CLASS_MARKERS = [
   'none',
   'aggregation',

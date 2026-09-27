@@ -50,6 +50,6 @@ main().catch(async (cause: unknown) => {
     const { formatError } = await import('./index');
     process.stderr.write(`${formatError(message)}\n`);
   } catch {
-    process.stderr.write(`m2rf: ${message}\n`);
+    process.stderr.write(`m2rd: ${message}\n`);
   }
 });

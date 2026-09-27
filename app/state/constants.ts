@@ -233,7 +233,7 @@ const DOCUMENT = appSetup.createStateConfig({
 });
 
 export const APP_MACHINE_CONFIG = {
-  id: 'm2rf',
+  id: 'm2rd',
   type: 'parallel',
   context: APP_INITIAL_CONTEXT,
   on: {
