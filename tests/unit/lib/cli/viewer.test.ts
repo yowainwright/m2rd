@@ -1,9 +1,9 @@
 // @vitest-environment node
-import { createActor } from 'xstate';
-import { expect, test } from 'vitest';
+import { createActor, fromPromise, waitFor } from 'xstate';
+import { expect, test, vi } from 'vitest';
 import type { Key } from 'ink';
 import { VIEWER_MACHINE } from '@/app/lib/cli/viewer/constants';
-import { keyboardEvent, measureDiagram } from '@/app/lib/cli/viewer/utils';
+import { keyboardEvent, measureDiagram, viewerStatusText } from '@/app/lib/cli/viewer/utils';
 
 const key: Key = {
   upArrow: false,
@@ -71,4 +71,63 @@ test('measures terminal cells without counting ANSI escape sequences', () => {
     contentWidth: 4,
     contentHeight: 2,
   });
+});
+
+test('maps the save shortcut without accepting modified keys', () => {
+  const ctrl = Object.assign({}, key, { ctrl: true });
+  expect(keyboardEvent('s', key, 20)).toEqual({ type: 'save' });
+  expect(keyboardEvent('s', ctrl, 20)).toBeUndefined();
+});
+
+test('adds save to the existing scroll footer without removing navigation or position', () => {
+  const context = { contentWidth: 59, contentHeight: 22, width: 59, height: 22, left: 0, top: 0 };
+  const svgExport = { source: 'flowchart TD\n A-->B', path: 'example.svg' };
+  const exporting = Object.assign({}, context, { svgExport });
+  const original = viewerStatusText(context);
+  const withSave = viewerStatusText(exporting);
+  expect(withSave.replace(' | s save SVG', '')).toBe(original);
+  expect(withSave).toContain('arrows / hjkl scroll');
+  expect(withSave).toContain('1,1 | 59x22');
+  expect(withSave.length).toBeLessThanOrEqual(60);
+});
+
+test('ignores save in a viewer without an SVG export', () => {
+  const input = { contentWidth: 10, contentHeight: 10, width: 20, height: 20, left: 0, top: 0 };
+  const actor = createActor(VIEWER_MACHINE, { input }).start();
+  actor.send({ type: 'save' });
+  expect(actor.getSnapshot().value).toBe('viewing');
+  expect(actor.getSnapshot().context.message).toBeUndefined();
+  actor.stop();
+});
+
+test('waits for one save to finish before accepting another', async () => {
+  const pending = Promise.withResolvers<void>();
+  const save = vi.fn(() => pending.promise);
+  const machine = VIEWER_MACHINE.provide({ actors: { saveSvg: fromPromise(save) } });
+  const svgExport = { source: 'flowchart TD\n A-->B', path: 'example.svg' };
+  const input = {
+    contentWidth: 10,
+    contentHeight: 10,
+    width: 20,
+    height: 20,
+    left: 0,
+    top: 0,
+    svgExport,
+  };
+  const actor = createActor(machine, { input }).start();
+  try {
+    actor.send({ type: 'save' });
+    actor.send({ type: 'save' });
+    expect(actor.getSnapshot().value).toBe('saving');
+    expect(actor.getSnapshot().context.message).toBe('Saving SVG...');
+    expect(save).toHaveBeenCalledOnce();
+    pending.resolve();
+    await waitFor(actor, (snapshot) => snapshot.matches('viewing'));
+    expect(actor.getSnapshot().context.message).toBe('Saved example.svg');
+    actor.send({ type: 'save' });
+    await waitFor(actor, (snapshot) => snapshot.matches('viewing'));
+    expect(save).toHaveBeenCalledTimes(2);
+  } finally {
+    actor.stop();
+  }
 });

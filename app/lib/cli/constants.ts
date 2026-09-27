@@ -12,8 +12,9 @@ export const CLI_HELP = `Usage: m2rd [file.mmd] [--width columns] [--ascii] [--c
   m2rd --styleguide
   m2rd --styleguide -o styleguide.svg
 
---styleguide previews terminal components and theme values using built-in diagrams.
+--styleguide shows an example diagram with its color palette below.
 Scrolls in a terminal; prints a static preview when piped or in CI.
+Press s in the styleguide to save m2rd-styleguide.svg in the current directory.
 Combine with --output to export a Mermaid SVG theme sample.
 
 --output (-o) writes a static SVG without opening the viewer or requiring a terminal.

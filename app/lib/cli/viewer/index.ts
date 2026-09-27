@@ -6,8 +6,15 @@ import { ScrollView } from '@/app/components/ui/scroll-view';
 import { UnicodeContext } from '@/app/hooks/useUnicode';
 import { errorMessage } from '../utils';
 import { VIEWER_MACHINE } from './constants';
-import { keyboardEvent, measureDiagram, terminalInput, viewportSize } from './utils';
-import type { ViewerContext, ViewerProps } from './types';
+import {
+  keyboardEvent,
+  measureDiagram,
+  terminalInput,
+  viewerSize,
+  viewerStatusText,
+  viewportSize,
+} from './utils';
+import type { ViewerContext, ViewerProps, ViewerSize, ViewerSvgExport } from './types';
 
 const viewerContents = (diagram: string, context: ViewerContext) => {
   const { width, height, contentWidth, contentHeight, left: scrollLeft, top: scrollTop } = context;
@@ -25,18 +32,33 @@ const viewerContents = (diagram: string, context: ViewerContext) => {
 };
 
 const viewerStatus = (context: ViewerContext) => {
-  const column = context.left + 1;
-  const row = context.top + 1;
-  const label = `arrows / hjkl scroll | q quit | ${column},${row} | ${context.contentWidth}x${context.contentHeight}`;
+  const label = viewerStatusText(context);
   return createElement(Text, { dimColor: true, wrap: 'truncate-end' }, label);
 };
 
-const Viewer = ({ diagram, ascii }: ViewerProps) => {
-  const { columns, rows } = useWindowSize();
+const viewerScreen = (diagram: string, context: ViewerContext, size: ViewerSize) => {
+  const { columns, rows } = size;
+  const small = columns < 2 || rows < 3;
+  const contents = small
+    ? createElement(Text, { wrap: 'truncate-end' }, 'Resize terminal; q quits')
+    : viewerContents(diagram, context);
+  const status = small ? null : viewerStatus(context);
+  return createElement(
+    Box,
+    { width: columns, height: rows, flexDirection: 'column', overflow: 'hidden' },
+    contents,
+    status,
+  );
+};
+
+const Viewer = ({ diagram, ascii, viewport, svgExport }: ViewerProps) => {
+  const terminal = useWindowSize();
+  const dimensions = viewerSize(terminal, viewport);
+  const { columns, rows } = dimensions;
   const { exit } = useApp();
   const size = useMemo(() => measureDiagram(diagram), [diagram]);
   const { width, height } = viewportSize(columns, rows);
-  const input = Object.assign({}, size, { width, height, left: 0, top: 0 });
+  const input = Object.assign({}, size, { width, height, left: 0, top: 0, svgExport });
   const [snapshot, send] = useMachine(VIEWER_MACHINE, { input });
   useEffect(() => {
     send({ type: 'resize', width, height });
@@ -48,28 +70,23 @@ const Viewer = ({ diagram, ascii }: ViewerProps) => {
     const event = keyboardEvent(input, key, snapshot.context.height);
     if (event) send(event);
   });
-  const small = columns < 2 || rows < 3;
-  const contents = small
-    ? createElement(Text, { wrap: 'truncate-end' }, 'Resize terminal; q quits')
-    : viewerContents(diagram, snapshot.context);
-  const status = small ? null : viewerStatus(snapshot.context);
-  const screen = createElement(
-    Box,
-    { width: columns, height: rows, flexDirection: 'column', overflow: 'hidden' },
-    contents,
-    status,
-  );
+  const screen = viewerScreen(diagram, snapshot.context, dimensions);
   const value = { unicode: !ascii };
   return createElement(UnicodeContext.Provider, { value }, screen);
 };
 
-export const showViewer = (diagram: string, ascii: boolean) =>
+export const showViewer = (
+  diagram: string,
+  ascii: boolean,
+  viewport?: ViewerSize,
+  svgExport?: ViewerSvgExport,
+) =>
   Effect.scoped(
     terminalInput.pipe(
       Effect.flatMap(({ stream }) =>
         Effect.tryPromise({
           try: async () => {
-            const tree = createElement(Viewer, { diagram, ascii });
+            const tree = createElement(Viewer, { diagram, ascii, viewport, svgExport });
             const app = render(tree, {
               stdin: stream,
               alternateScreen: true,

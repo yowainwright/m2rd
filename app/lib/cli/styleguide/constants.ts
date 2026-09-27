@@ -1,27 +1,7 @@
-export const STYLEGUIDE_EXAMPLES = [
-  {
-    title: 'Flowchart: nodes, decisions, and arrows',
-    source:
-      'flowchart TD\n A[Mermaid source] --> B{Valid?}\n B -->|Yes| C[SVG image]\n B -->|No| D[Error]',
-  },
-  {
-    title: 'Sequence: messages and branches',
-    source: `sequenceDiagram
-    participant User
-    participant CLI
-    User->>CLI: Render diagram
-    alt Valid source
-        CLI-->>User: SVG image
-    else Invalid source
-        CLI-->>User: Error
-    end`,
-  },
-  {
-    title: 'State: start, transitions, and end',
-    source:
-      'stateDiagram-v2\n [*] --> Ready\n Ready --> Rendering: export\n Rendering --> Saved: success\n Saved --> [*]',
-  },
-];
+export const STYLEGUIDE_VIEWPORT = { columns: 60, rows: 24 };
+export const STYLEGUIDE_EXPORT_PATH = 'm2rd-styleguide.svg';
+
+export const STYLEGUIDE_EXAMPLE = 'flowchart TD\n A[Mermaid] --> B{Valid?}\n B --> C[SVG]';
 
 export const SVG_SWATCHES = [
   {
@@ -60,4 +40,4 @@ flowchart TB
     Valid -->|Yes| Image[SVG image]
     Valid -.->|No| Error[Error message]
   end
-  palette ~~~ diagram`;
+  diagram ~~~ palette`;

@@ -1,10 +1,26 @@
 import { closeSync, openSync } from 'node:fs';
 import { ReadStream } from 'node:tty';
-import { assign, assertEvent, setup } from 'xstate';
+import { assign, assertEvent, fromPromise, setup } from 'xstate';
 import { Effect } from 'effect';
 import stringWidth from 'string-width';
 import type { Key } from 'ink';
-import type { TerminalInput, ViewerContext, ViewerEvent } from './types';
+import { errorMessage, exportSvg } from '../utils';
+import type { TerminalInput, ViewerContext, ViewerEvent, ViewerSize } from './types';
+
+export const viewerSize = (terminal: ViewerSize, viewport: ViewerSize = terminal) => {
+  const columns = Math.min(terminal.columns, viewport.columns);
+  const rows = Math.min(terminal.rows, viewport.rows);
+  return { columns, rows };
+};
+
+export const viewerStatusText = (context: ViewerContext) => {
+  const column = context.left + 1;
+  const row = context.top + 1;
+  const position = `${column},${row} | ${context.contentWidth}x${context.contentHeight}`;
+  const save = context.svgExport ? ' | s save SVG' : '';
+  const details = context.message ?? position;
+  return `arrows / hjkl scroll${save} | q quit | ${details}`;
+};
 
 export const measureDiagram = (diagram: string) => {
   const lines = diagram.split('\n');
@@ -32,7 +48,23 @@ export const viewerSetup = setup({
     input: {} as ViewerContext,
     events: {} as ViewerEvent,
   },
+  actors: {
+    saveSvg: fromPromise(({ input, signal }: { input: ViewerContext; signal: AbortSignal }) => {
+      if (!input.svgExport) throw new Error('SVG export is unavailable.');
+      const { source, path } = input.svgExport;
+      return Effect.runPromise(exportSvg(source, path), { signal });
+    }),
+  },
+  guards: {
+    canSave: ({ context }) => Boolean(context.svgExport),
+  },
   actions: {
+    saving: assign({ message: 'Saving SVG...' }),
+    saved: assign(({ context }) => ({ message: `Saved ${context.svgExport?.path}` })),
+    saveFailed: assign((_, cause: unknown) => {
+      const message = `Save failed: ${errorMessage(cause)}`;
+      return { message };
+    }),
     scroll: assign(({ context, event }) => {
       assertEvent(event, 'scroll');
       const left = context.left + event.x;
@@ -56,6 +88,7 @@ export const keyboardEvent = (input: string, key: Key, page: number): ViewerEven
   if (quit) return { type: 'quit' };
   const modified = key.ctrl || key.meta || key.shift;
   if (modified) return undefined;
+  if (input === 's') return { type: 'save' };
   if (key.home) return { type: 'home' };
   if (key.end) return { type: 'end' };
   if (key.pageUp) return { type: 'scroll', x: 0, y: -page };
