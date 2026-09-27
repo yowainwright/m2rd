@@ -7,6 +7,8 @@ const parseOptions = () => {
   const options = {
     ascii: { type: 'boolean' },
     width: { type: 'string' },
+    output: { type: 'string', short: 'o' },
+    styleguide: { type: 'boolean' },
     color: { type: 'boolean' },
     'no-color': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
@@ -16,6 +18,10 @@ const parseOptions = () => {
   if (conflict) throw new Error('Choose either --color or --no-color.');
   if (positionals.length > 1)
     throw new Error('Provide one Mermaid file, or pipe Mermaid through stdin.');
+  const styleguide = values.styleguide ?? false;
+  const hasStyleguideInput = styleguide && positionals.length > 0;
+  if (hasStyleguideInput)
+    throw new Error('--styleguide uses built-in examples; omit the input file.');
   if (values.color) {
     process.env.FORCE_COLOR = '1';
     delete process.env.NO_COLOR;
@@ -25,7 +31,11 @@ const parseOptions = () => {
   const validWidth = Number.isInteger(width) && width >= MIN_WIDTH && width <= MAX_WIDTH;
   if (!validWidth) throw new Error(`--width must be an integer from ${MIN_WIDTH} to ${MAX_WIDTH}.`);
   const path = positionals[0] === '-' ? undefined : positionals[0];
-  return { path, help: values.help, width, ascii: values.ascii ?? false };
+  const output = values.output;
+  const invalidOutput = output !== undefined && !output.toLowerCase().endsWith('.svg');
+  if (invalidOutput)
+    throw new Error('--output must be a .svg file. CLI image export supports SVG.');
+  return { path, help: values.help, width, ascii: values.ascii ?? false, output, styleguide };
 };
 
 const main = async () => {
@@ -35,7 +45,9 @@ const main = async () => {
     return;
   }
   const { runCli, formatError } = await import('./index');
-  const result = await Effect.runPromise(Effect.either(runCli(options.path, options)));
+  const { runStyleguide } = await import('./styleguide');
+  const operation = options.styleguide ? runStyleguide(options) : runCli(options.path, options);
+  const result = await Effect.runPromise(Effect.either(operation));
   if (result._tag === 'Left') {
     process.stderr.write(`${formatError(result.left)}\n`);
     process.exitCode = 1;

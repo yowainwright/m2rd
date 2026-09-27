@@ -7,6 +7,18 @@ export const CLI_HELP = `Usage: m2rd [file.mmd] [--width columns] [--ascii] [--c
 
   cat chart.mmd | m2rd
   m2rd chart.mmd --width 60
+  m2rd chart.mmd --output chart.svg
+  cat chart.mmd | m2rd -o chart.svg
+  m2rd --styleguide
+  m2rd --styleguide -o styleguide.svg
+
+--styleguide previews terminal components and theme values using built-in diagrams.
+Scrolls in a terminal; prints a static preview when piped or in CI.
+Combine with --output to export a Mermaid SVG theme sample.
+
+--output (-o) writes a static SVG without opening the viewer or requiring a terminal.
+Uses cyan/slate image defaults; customize with Mermaid frontmatter config.themeVariables.
+The output must end in .svg and must not already exist. PNG/GIF are not supported.
 
 Opens an interactive viewer. An interactive terminal is required.
 Arrow keys or h/j/k/l scroll; Page Up/Down page vertically; Home/End jump; q or Ctrl+C quit.
