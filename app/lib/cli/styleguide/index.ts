@@ -14,8 +14,7 @@ const formatStyleguide = (options: CliOptions) =>
     }),
   );
 
-const presentStyleguide = (content: string, options: CliOptions) => {
-  const interactive = process.stdout.isTTY && !process.env.CI && !process.env.GITHUB_ACTIONS;
+const presentStyleguide = (content: string, options: CliOptions, interactive: boolean) => {
   if (interactive) {
     const source = svgStyleguideSource();
     const svgExport = { source, path: STYLEGUIDE_EXPORT_PATH };
@@ -31,9 +30,14 @@ const presentStyleguide = (content: string, options: CliOptions) => {
 
 export const runStyleguide = (options: CliOptions) => {
   if (options.output) return exportSvg(svgStyleguideSource(), options.output);
-  const width = Math.min(options.width, STYLEGUIDE_VIEWPORT.columns - 1);
+  const interactive = Boolean(
+    process.stdout.isTTY && !process.env.CI && !process.env.GITHUB_ACTIONS,
+  );
+  const width = interactive
+    ? Math.min(options.width, STYLEGUIDE_VIEWPORT.columns - 1)
+    : options.width;
   const compact = Object.assign({}, options, { width });
   return formatStyleguide(compact).pipe(
-    Effect.flatMap((content) => presentStyleguide(content, options)),
+    Effect.flatMap((content) => presentStyleguide(content, options, interactive)),
   );
 };

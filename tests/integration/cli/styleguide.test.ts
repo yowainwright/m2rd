@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Effect } from 'effect';
 import { JSDOM } from 'jsdom';
+import stringWidth from 'string-width';
 import { createActor, waitFor } from 'xstate';
 import { afterAll, afterEach, expect, test, vi } from 'vitest';
 import { runStyleguide } from '@/app/lib/cli/styleguide';
@@ -21,6 +22,7 @@ const directory = mkdtempSync(resolve(root, 'styleguide-save-'));
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  vi.clearAllMocks();
 });
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
@@ -53,6 +55,36 @@ test('exposes the SVG export in the interactive styleguide', async () => {
     STYLEGUIDE_VIEWPORT,
     { source: svgStyleguideSource(), path: STYLEGUIDE_EXPORT_PATH },
   );
+  const content = vi.mocked(showViewer).mock.calls[0][0];
+  expect(Math.max(...content.split('\n').map((line) => stringWidth(line)))).toBe(59);
+});
+
+test.each(['pipe', 'CI'])('preserves requested width in a %s styleguide preview', async (mode) => {
+  const write = vi.fn((_chunk: string) => true);
+  const stdout = Object.create(process.stdout);
+  Object.defineProperties(stdout, {
+    isTTY: { value: mode === 'CI' },
+    write: { value: write },
+  });
+  vi.spyOn(process, 'stdout', 'get').mockReturnValue(stdout);
+  vi.stubEnv('CI', mode === 'CI' ? 'true' : '');
+  vi.stubEnv('GITHUB_ACTIONS', '');
+  await Effect.runPromise(runStyleguide({ width: 120, ascii: true }));
+  const content = String(write.mock.calls[0][0]);
+  expect(content.indexOf('Mermaid')).toBeLessThan(content.indexOf('Colors'));
+  expect(Math.max(...content.split('\n').map((line) => stringWidth(line)))).toBe(120);
+  expect(content).not.toMatch(/[\u2500-\u257f]/u);
+  expect(showViewer).not.toHaveBeenCalled();
+});
+
+test('exports the styleguide SVG directly without opening a viewer', async () => {
+  const output = resolve(directory, 'direct.svg');
+  await Effect.runPromise(runStyleguide({ width: 80, ascii: false, output }));
+  const image = new JSDOM(readFileSync(output, 'utf8'), { contentType: 'image/svg+xml' });
+  expect(image.window.document.documentElement.localName).toBe('svg');
+  expect(image.window.document.documentElement.textContent).toContain('m2rd Mermaid theme');
+  image.window.close();
+  expect(showViewer).not.toHaveBeenCalled();
 });
 
 test('saves a real themed SVG and preserves it when saving again', async () => {

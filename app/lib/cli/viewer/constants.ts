@@ -19,6 +19,7 @@ export const VIEWER_MACHINE = viewerSetup.createMachine({
     },
     saving: {
       entry: 'saving',
+      on: { quit: { actions: 'waitForSave' } },
       invoke: {
         src: 'saveSvg',
         input: ({ context }) => context,

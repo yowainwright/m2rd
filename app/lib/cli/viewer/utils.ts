@@ -60,6 +60,7 @@ export const viewerSetup = setup({
   },
   actions: {
     saving: assign({ message: 'Saving SVG...' }),
+    waitForSave: assign({ message: 'Saving SVG; wait to quit.' }),
     saved: assign(({ context }) => ({ message: `Saved ${context.svgExport?.path}` })),
     saveFailed: assign((_, cause: unknown) => {
       const message = `Save failed: ${errorMessage(cause)}`;

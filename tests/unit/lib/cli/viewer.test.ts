@@ -3,6 +3,7 @@ import { createActor, fromPromise, waitFor } from 'xstate';
 import { expect, test, vi } from 'vitest';
 import type { Key } from 'ink';
 import { VIEWER_MACHINE } from '@/app/lib/cli/viewer/constants';
+import type { ViewerContext } from '@/app/lib/cli/viewer/types';
 import { keyboardEvent, measureDiagram, viewerStatusText } from '@/app/lib/cli/viewer/utils';
 
 const key: Key = {
@@ -127,6 +128,42 @@ test('waits for one save to finish before accepting another', async () => {
     actor.send({ type: 'save' });
     await waitFor(actor, (snapshot) => snapshot.matches('viewing'));
     expect(save).toHaveBeenCalledTimes(2);
+  } finally {
+    actor.stop();
+  }
+});
+
+test.each(['success', 'failure'])('waits for save %s before allowing quit', async (outcome) => {
+  const pending = Promise.withResolvers<void>();
+  const save = fromPromise<void, ViewerContext>(({ signal }) => {
+    signal.addEventListener('abort', () => pending.reject(new Error('Save aborted')));
+    return pending.promise;
+  });
+  const machine = VIEWER_MACHINE.provide({ actors: { saveSvg: save } });
+  const svgExport = { source: 'flowchart TD\n A-->B', path: 'example.svg' };
+  const input = {
+    contentWidth: 10,
+    contentHeight: 10,
+    width: 20,
+    height: 20,
+    left: 0,
+    top: 0,
+    svgExport,
+  };
+  const actor = createActor(machine, { input }).start();
+  try {
+    actor.send({ type: 'save' });
+    actor.send({ type: 'quit' });
+    expect(actor.getSnapshot().value).toBe('saving');
+    expect(actor.getSnapshot().status).toBe('active');
+    expect(actor.getSnapshot().context.message).toContain('wait to quit');
+    if (outcome === 'success') pending.resolve();
+    else pending.reject(new Error('Disk full'));
+    await waitFor(actor, (snapshot) => snapshot.matches('viewing'));
+    const message = outcome === 'success' ? 'Saved example.svg' : 'Save failed: Disk full';
+    expect(actor.getSnapshot().context.message).toBe(message);
+    actor.send({ type: 'quit' });
+    expect(actor.getSnapshot().status).toBe('done');
   } finally {
     actor.stop();
   }
