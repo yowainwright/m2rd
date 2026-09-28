@@ -19,7 +19,7 @@ test.each([
   { getTasks: () => [{ vert: true }], getDisplayMode: (): string => '' },
 ])('fails closed before rendering incompatible Gantt DB %#', async (db) => {
   vi.mocked(mermaid.mermaidAPI.getDiagramFromText).mockResolvedValue({ db } as never);
-  const before = document.body.childElementCount;
+  const { childElementCount: before } = document.body;
   await expect(renderGanttDiagram('guard', 'gantt', DEFAULT_SETTINGS)).rejects.toThrow(
     'This Gantt diagram is not supported',
   );
@@ -29,7 +29,7 @@ test.each([
 
 test('cleans up the measurement host when Mermaid rejects source', async () => {
   vi.mocked(mermaid.mermaidAPI.getDiagramFromText).mockRejectedValue(new Error('Invalid date'));
-  const before = document.body.childElementCount;
+  const { childElementCount: before } = document.body;
   await expect(renderGanttDiagram('bad-date', 'gantt', DEFAULT_SETTINGS)).rejects.toThrow(
     'Invalid date',
   );

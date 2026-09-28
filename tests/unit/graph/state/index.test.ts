@@ -43,23 +43,21 @@ const layout = { nodes: [state, parent], edges: [transition] };
 const create = (value: unknown = layout) =>
   createStateElements(readStateLayout(value), DEFAULT_SETTINGS);
 
-describe('state diagram adapter', () => {
-  test('uses IDs safe for React Flow attribute selectors', () => {
+const stateDiagramAdapterCases = {
+  'uses IDs safe for React Flow attribute selectors': () => {
     const result = create();
     const ids = result.nodes.map((node) => node.id).concat(result.edges.map((edge) => edge.id));
     ids.forEach((id) => {
       expect(() => document.querySelector(`[data-id="${id}"]`)).not.toThrow();
     });
-  });
-
-  test('keeps transition IDs stable when unrelated transitions are inserted', () => {
+  },
+  'keeps transition IDs stable when unrelated transitions are inserted': () => {
     const extra = Object.assign({}, transition, { start: 'Active', end: 'Ready' });
     const next = create({ nodes: layout.nodes, edges: [extra, transition, transition] });
     expect(next.edges[1].id).toBe(create().edges[0].id);
     expect(next.edges[2].id).not.toBe(next.edges[1].id);
-  });
-
-  test('orders parents first and converts absolute coordinates to parent-relative positions', () => {
+  },
+  'orders parents first and converts absolute coordinates to parent-relative positions': () => {
     const result = create();
     expect(result.nodes[0].data.shape).toBe('roundedWithTitle');
     expect(result.nodes[1]).toMatchObject({
@@ -72,17 +70,8 @@ describe('state diagram adapter', () => {
     expect(result.nodes[1].data.handles).toHaveLength(2);
     expect(edge.label).toBe('retry');
     expect(edge.data.points).toEqual(transition.points);
-  });
-
-  test.each(STATE_SHAPES.filter((shape) => shape !== 'note'))(
-    'preserves the %s symbol',
-    (shape) => {
-      const result = create({ nodes: [Object.assign({}, parent, { shape })], edges: [] });
-      expect(result.nodes[0].data.shape).toBe(shape);
-    },
-  );
-
-  test('keeps concurrent-region and terminal IDs stable when Mermaid generates new IDs', () => {
+  },
+  'keeps concurrent-region and terminal IDs stable when Mermaid generates new IDs': () => {
     const concurrent = (id: string) => ({
       nodes: [
         parent,
@@ -96,14 +85,12 @@ describe('state diagram adapter', () => {
     const next = create(concurrent('random-2'));
     expect(next.nodes.map((node) => node.id)).toEqual(first.nodes.map((node) => node.id));
     expect(new Set(next.nodes.map((node) => node.id)).size).toBe(next.nodes.length);
-  });
-
-  test('rejects notes without an association', () => {
+  },
+  'rejects notes without an association': () => {
     const note = Object.assign({}, state, { id: 'note', shape: 'note' });
     expect(() => create({ nodes: [parent, note], edges: [] })).toThrow('incompatible');
-  });
-
-  test('preserves notes, text, and dashed arrowless associations', () => {
+  },
+  'preserves notes, text, and dashed arrowless associations': () => {
     const note = Object.assign({}, state, {
       id: 'note-1',
       shape: 'note',
@@ -126,9 +113,8 @@ describe('state diagram adapter', () => {
     });
     expect(edited.edges[0].markerEnd).toBeUndefined();
     expect(edited.edges[0].type).toBe('stateTransition');
-  });
-
-  test('keeps state geometry and markers when global shape settings change', () => {
+  },
+  'keeps state geometry and markers when global shape settings change': () => {
     const initial = create();
     const edited = applySettings(initial, {
       nodeShape: 'diamond',
@@ -138,9 +124,8 @@ describe('state diagram adapter', () => {
     expect(edited.nodes[1].style).toEqual(initial.nodes[1].style);
     expect(getStateSurface(edited.nodes[1].data).clipPath).toBeUndefined();
     expect(edited.edges[0].markerEnd).toEqual({ type: 'arrowclosed', color: '#123456' });
-  });
-
-  test('restores appearance without restoring stale labels, routes, or hierarchy', () => {
+  },
+  'restores appearance without restoring stale labels, routes, or hierarchy': () => {
     const saved = applySettings(create(), { primaryColor: '#abcdef', edgeColor: '#123456' });
     saved.nodes[1].position = { x: 70, y: 90 };
     const fresh = create({
@@ -162,8 +147,22 @@ describe('state diagram adapter', () => {
     expect(restored.edges[0].data.points).toEqual(fresh.edges[0].data.points);
     expect(restored.edges[0].label).toBe('new');
     expect(restored.edges[0].style?.stroke).toBe('#123456');
-  });
+  },
+  'rejects parent cycles': () => {
+    expect(() =>
+      create({ nodes: [Object.assign({}, parent, { parentId: 'Active' })], edges: [] }),
+    ).toThrow('incompatible');
+  },
+};
 
+describe('state diagram adapter', () => {
+  test.each(STATE_SHAPES.filter((shape) => shape !== 'note'))(
+    'preserves the %s symbol',
+    (shape) => {
+      const result = create({ nodes: [Object.assign({}, parent, { shape })], edges: [] });
+      expect(result.nodes[0].data.shape).toBe(shape);
+    },
+  );
   test.each([
     { nodes: [{ id: 'missing geometry' }], edges: [] },
     { nodes: [Object.assign({}, parent, { x: NaN })], edges: [] },
@@ -173,10 +172,5 @@ describe('state diagram adapter', () => {
   ])('rejects incompatible data instead of guessing', (value) => {
     expect(() => readStateLayout(value)).toThrow('incompatible');
   });
-
-  test('rejects parent cycles', () => {
-    expect(() =>
-      create({ nodes: [Object.assign({}, parent, { parentId: 'Active' })], edges: [] }),
-    ).toThrow('incompatible');
-  });
+  Object.entries(stateDiagramAdapterCases).forEach(([name, run]) => test(name, run));
 });

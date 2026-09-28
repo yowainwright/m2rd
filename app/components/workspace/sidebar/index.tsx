@@ -49,9 +49,11 @@ function useWorkspaceNavigation() {
   const versions = AppContext.useSelector((state) => state.context.versions);
   const canNavigate = AppContext.useSelector((state) => state.can({ type: 'workspace.create' }));
   const { setOpenMobile } = useSidebar();
-  const versionItems: VersionTreeItem[] = versions.map((version) => {
-    return { id: version.id, timestamp: version.updatedAt, version: version.version };
-  });
+  const versionItems: VersionTreeItem[] = versions.map((version) => ({
+    id: version.id,
+    timestamp: version.updatedAt,
+    version: version.version,
+  }));
   const handleVersionSelect = (versionId: string) => {
     send({ type: 'workspace.load', request: { workspaceId: activeId, versionId } });
     setOpenMobile(false);

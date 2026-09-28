@@ -34,8 +34,6 @@ export const ErMetadataSchema = Schema.Struct({
 });
 export const ErPointsSchema = Schema.Array(StatePointSchema).pipe(Schema.minItems(2));
 
-// Mermaid ER end-marker geometry, anchored at its outer edge for native node handles.
-// https://github.com/mermaid-js/mermaid/blob/develop/packages/mermaid/src/rendering-util/rendering-elements/markers.js
 export const ER_MARKERS = {
   only_one: { path: 'M3,0 L3,18 M9,0 L9,18', width: 18, height: 18, circle: false },
   zero_or_one: { path: 'M21,0 L21,18', width: 30, height: 18, circle: true },

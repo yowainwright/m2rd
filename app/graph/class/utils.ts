@@ -185,7 +185,7 @@ export const readClassPoints = (graphics: ClassGraphics, id: string) => {
     const result = Schema.decodeUnknownEither(ClassPointsSchema)(JSON.parse(atob(encoded)));
     if (result._tag === 'Right') return result.right;
   } catch {
-    /* Incompatible encoded route data is reported at the same boundary. */
+    throw classCompatibilityError();
   }
   throw classCompatibilityError();
 };

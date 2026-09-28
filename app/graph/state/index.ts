@@ -1,3 +1,4 @@
+import type { StateNodeOptions } from './types';
 import { Array as EffectArray, Schema } from 'effect';
 import mermaid from 'mermaid';
 import mermaidMetadata from 'mermaid/package.json';
@@ -175,13 +176,13 @@ const getStateHandles = (edges: Edge<StateEdgeData>[], nodes: Map<string, StateL
   return new Map(handles);
 };
 
-const createStateNode = (
-  node: StateLayoutNode,
-  ids: Map<string, string>,
-  nodes: Map<string, StateLayoutNode>,
-  handles: Map<string, StateHandle[]>,
-  settings: TranslationSettings,
-): Node<StateNodeData> => {
+const createStateNode = ({
+  node,
+  ids,
+  nodes,
+  handles,
+  settings,
+}: StateNodeOptions): Node<StateNodeData> => {
   const id = ids.get(node.id)!;
   const parentId = node.parentId ? ids.get(node.parentId) : undefined;
   const parent = node.parentId ? getTopLeft(nodes.get(node.parentId)!) : { x: 0, y: 0 };
@@ -249,7 +250,9 @@ export const createStateElements = (
   const byStableId = new Map(layout.nodes.map((node) => [ids.get(node.id)!, node]));
   const edges = createStateEdges(layout, ids, settings);
   const handles = getStateHandles(edges, byStableId);
-  const nodes = layout.nodes.map((node) => createStateNode(node, ids, byRawId, handles, settings));
+  const nodes = layout.nodes.map((node) =>
+    createStateNode({ node, ids, nodes: byRawId, handles, settings }),
+  );
   return { nodes: orderStateNodes(nodes), edges };
 };
 
@@ -277,7 +280,6 @@ export const renderStateDiagram = async (
 ) => {
   const host = createLayoutHost(id, settings.fontFamily);
   try {
-    // One Diagram instance is essential: reparsing creates different concurrent-region IDs.
     const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
     await diagram.render(id, mermaidMetadata.version);
     const db = diagram.db;

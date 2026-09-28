@@ -98,34 +98,37 @@ test('hydrates Gantt appearance without adding default fills to decorations', ()
   expect(hydrated.elements.nodes[1].style).toEqual(ganttNode.style);
 });
 
-describe('node appearance defaults', () => {
-  test('keeps vertical and rectangle node overrides after hydration with different global defaults', () => {
-    const nodeGradient = Object.assign({}, DEFAULT_SETTINGS.nodeGradient, {
-      direction: 'horizontal' as const,
-    });
-    const settings = Object.assign({}, DEFAULT_SETTINGS, {
-      nodeGradient,
-      nodeShape: 'circle' as const,
-    });
-    const node = {
-      id: 'A',
-      data: { label: 'A' },
-      position: { x: 0, y: 0 },
-      style: createNodeStyle(settings),
-    };
-    const elements = updateSelectedNodes({ nodes: [node], edges: [] }, ['A'], {
-      nodeGradient: DEFAULT_SETTINGS.nodeGradient,
-      nodeShape: 'rectangle',
-    });
-    const translation = Object.assign({}, APP_INITIAL_CONTEXT.translation, { elements, settings });
-    const hydrated = getTranslation(translation);
-    const [selected] = hydrated.elements.nodes;
+const nodeAppearanceDefaultsCases = {
+  'keeps vertical and rectangle node overrides after hydration with different global defaults':
+    () => {
+      const nodeGradient = Object.assign({}, DEFAULT_SETTINGS.nodeGradient, {
+        direction: 'horizontal' as const,
+      });
+      const settings = Object.assign({}, DEFAULT_SETTINGS, {
+        nodeGradient,
+        nodeShape: 'circle' as const,
+      });
+      const node = {
+        id: 'A',
+        data: { label: 'A' },
+        position: { x: 0, y: 0 },
+        style: createNodeStyle(settings),
+      };
+      const elements = updateSelectedNodes({ nodes: [node], edges: [] }, ['A'], {
+        nodeGradient: DEFAULT_SETTINGS.nodeGradient,
+        nodeShape: 'rectangle',
+      });
+      const translation = Object.assign({}, APP_INITIAL_CONTEXT.translation, {
+        elements,
+        settings,
+      });
+      const hydrated = getTranslation(translation);
+      const [selected] = hydrated.elements.nodes;
 
-    expect(getNodeGradientValue(selected, hydrated.settings).direction).toBe('vertical');
-    expect(getNodeShapeValue(selected, hydrated.settings)).toBe('rectangle');
-  });
-
-  test('uses neutral solid nodes and no canvas background', () => {
+      expect(getNodeGradientValue(selected, hydrated.settings).direction).toBe('vertical');
+      expect(getNodeShapeValue(selected, hydrated.settings)).toBe('rectangle');
+    },
+  'uses neutral solid nodes and no canvas background': () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       inverseColor: '#171717',
       nodeSurface: 'solid',
@@ -143,45 +146,27 @@ describe('node appearance defaults', () => {
       backgroundImage: 'none',
       color: '#171717',
     });
-  });
+  },
+};
+
+describe('node appearance defaults', () => {
+  Object.entries(nodeAppearanceDefaultsCases).forEach(([name, run]) => test(name, run));
 });
 
-describe('sequence appearance', () => {
-  test.each(['none', 'arrow', 'arrowclosed'] as const)(
-    'updates the selected start marker to %s and reports it in the toolkit',
-    (edgeMarker) => {
+const sequenceAppearanceCases = {
+  'removes and restores both bidirectional markers globally without adding an arrow to the action':
+    () => {
       const svg = sequenceSvg.replace('marker-end=', 'marker-start="url(#arrowhead)" marker-end=');
       const original = parseMermaidSvg(svg, DEFAULT_SETTINGS, 'sequence');
-      const edited = updateSelectedEdges(original, ['message-i0-source'], { edgeMarker });
-      const recolored = updateSelectedEdges(edited, ['message-i0-source'], {
-        edgeColor: '#123456',
-      });
-      const [source, target] = recolored.edges;
-
-      expect(getEdgeMarkerValue(source, DEFAULT_SETTINGS)).toBe(edgeMarker);
+      const removed = applySettings(original, { edgeMarker: 'none' });
+      expect(removed.edges.every((edge) => !edge.markerStart && !edge.markerEnd)).toBe(true);
+      const [source, target] = applySettings(removed, { edgeMarker: 'arrow' }).edges;
+      expect(source.markerStart).toEqual({ type: 'arrow', color: DEFAULT_SETTINGS.edgeColor });
       expect(source.markerEnd).toBeUndefined();
-      expect(target).toEqual(original.edges[1]);
-      if (edgeMarker === 'none') {
-        expect(source.markerStart).toBeUndefined();
-        return;
-      }
-      expect(source.markerStart).toEqual({ type: edgeMarker, color: '#123456' });
+      expect(target.markerStart).toBeUndefined();
+      expect(target.markerEnd).toEqual({ type: 'arrow', color: DEFAULT_SETTINGS.edgeColor });
     },
-  );
-
-  test('removes and restores both bidirectional markers globally without adding an arrow to the action', () => {
-    const svg = sequenceSvg.replace('marker-end=', 'marker-start="url(#arrowhead)" marker-end=');
-    const original = parseMermaidSvg(svg, DEFAULT_SETTINGS, 'sequence');
-    const removed = applySettings(original, { edgeMarker: 'none' });
-    expect(removed.edges.every((edge) => !edge.markerStart && !edge.markerEnd)).toBe(true);
-    const [source, target] = applySettings(removed, { edgeMarker: 'arrow' }).edges;
-    expect(source.markerStart).toEqual({ type: 'arrow', color: DEFAULT_SETTINGS.edgeColor });
-    expect(source.markerEnd).toBeUndefined();
-    expect(target.markerStart).toBeUndefined();
-    expect(target.markerEnd).toEqual({ type: 'arrow', color: DEFAULT_SETTINGS.edgeColor });
-  });
-
-  test('refreshes arrow direction from Mermaid while retaining saved edge color', () => {
+  'refreshes arrow direction from Mermaid while retaining saved edge color': () => {
     const original = applySettings(createElements(), { edgeColor: '#123456' });
     const svg = sequenceSvg.replace('marker-end=', 'marker-start=');
     const fresh = parseMermaidSvg(svg, DEFAULT_SETTINGS, 'sequence');
@@ -191,30 +176,8 @@ describe('sequence appearance', () => {
     expect(source.data.markerStart).toBe(true);
     expect(target.markerEnd).toBeUndefined();
     expect(target.data.markerEnd).toBe(false);
-  });
-
-  test.each([
-    ['A', '#f3f4f6', 'solid', 'solid'],
-    ['action-message-i0', '#ffffff', 'none', 'solid'],
-    ['note-n0', '#f9fafb', 'solid', 'solid'],
-    ['frame-alt', '#ffffff', 'dashed', 'solid'],
-    ['frame-rect-0', '#f9fafb', 'none', 'pattern-diagonal'],
-  ])(
-    'keeps role defaults for %s without baking them into saved styles',
-    (id, fill, border, surface) => {
-      const node = createElements().nodes.find((item) => item.id === id);
-
-      expect(node).toBeDefined();
-      expect(node?.data.style).toEqual({});
-      expect(node?.data.styleVersion).toBe(1);
-      expect(getNodeFillValue(node, DEFAULT_SETTINGS)).toBe(fill);
-      expect(getNodeBorderValue(node, DEFAULT_SETTINGS)).toBe(border);
-      expect(getNodeSurfaceValue(node, DEFAULT_SETTINGS)).toBe(surface);
-      expect(getNodeTextValue(node, DEFAULT_SETTINGS)).toBe('#111827');
-    },
-  );
-
-  test('edits only the selected action without changing geometry or connections', () => {
+  },
+  'edits only the selected action without changing geometry or connections': () => {
     const elements = createElements();
     const before = structuredClone(elements);
     const edited = updateSelectedNodes(elements, ['action-message-i0'], {
@@ -231,56 +194,106 @@ describe('sequence appearance', () => {
       elements.nodes.filter((node) => node.id !== action?.id),
     );
     expect(elements).toEqual(before);
-  });
+  },
+  'removes legacy generated defaults but preserves custom colors without mutating the saved record':
+    () => {
+      const elements = createElements();
+      const style = Object.assign({}, createNodeStyle(DEFAULT_SETTINGS), { color: '#123456' });
+      const nodes = elements.nodes.map((node) =>
+        Object.assign({}, node, {
+          data: Object.assign({}, node.data, { style, styleVersion: undefined }),
+        }),
+      );
+      const saved = createTranslation({ nodes, edges: elements.edges });
+      const before = structuredClone(saved);
+      const hydrated = getTranslation(saved);
 
+      hydrated.elements.nodes.forEach((node) => {
+        expect(node.data.style).toEqual({ color: '#123456' });
+        expect(node.data.styleVersion).toBe(1);
+      });
+      expect(saved).toEqual(before);
+    },
+};
+
+const expectSelectedMarker = (edgeMarker: 'none' | 'arrow' | 'arrowclosed') => {
+  const svg = sequenceSvg.replace('marker-end=', 'marker-start="url(#arrowhead)" marker-end=');
+  const original = parseMermaidSvg(svg, DEFAULT_SETTINGS, 'sequence');
+  const edited = updateSelectedEdges(original, ['message-i0-source'], { edgeMarker });
+  const recolored = updateSelectedEdges(edited, ['message-i0-source'], {
+    edgeColor: '#123456',
+  });
+  const [source, target] = recolored.edges;
+
+  expect(getEdgeMarkerValue(source, DEFAULT_SETTINGS)).toBe(edgeMarker);
+  expect(source.markerEnd).toBeUndefined();
+  expect(target).toEqual(original.edges[1]);
+  if (edgeMarker === 'none') {
+    expect(source.markerStart).toBeUndefined();
+    return;
+  }
+  expect(source.markerStart).toEqual({ type: edgeMarker, color: '#123456' });
+};
+
+const expectSequenceRoleDefaults = (id: string, fill: string, border: string, surface: string) => {
+  const node = createElements().nodes.find((item) => item.id === id);
+
+  expect(node).toBeDefined();
+  expect(node?.data.style).toEqual({});
+  expect(node?.data.styleVersion).toBe(1);
+  expect(getNodeFillValue(node, DEFAULT_SETTINGS)).toBe(fill);
+  expect(getNodeBorderValue(node, DEFAULT_SETTINGS)).toBe(border);
+  expect(getNodeSurfaceValue(node, DEFAULT_SETTINGS)).toBe(surface);
+  expect(getNodeTextValue(node, DEFAULT_SETTINGS)).toBe('#111827');
+};
+
+const expectExplicitSequenceColor = (primaryColor: string) => {
+  const edited = updateSelectedNodes(createElements(), ['A'], { primaryColor });
+  const hydrated = getTranslation(createTranslation(edited));
+  const restored = applySavedAppearance(createElements(), hydrated.elements);
+  const node = restored.nodes.find((item) => item.id === 'A');
+
+  expect(node?.data.style.backgroundColor).toBe(primaryColor);
+  expect(node?.data.styleVersion).toBe(1);
+  expect(getNodeFillValue(node, DEFAULT_SETTINGS)).toBe(primaryColor);
+};
+
+const expectSequenceStyleReset = (resetLayout: boolean) => {
+  const fresh = createElements();
+  const edited = updateSelectedNodes(fresh, ['A'], { primaryColor: '#123456' });
+  const moved = edited.nodes.map((node) =>
+    Object.assign({}, node, { position: { x: 999, y: 999 } }),
+  );
+  const restored = applySavedAppearance(fresh, { nodes: moved, edges: edited.edges }, resetLayout);
+  const participant = restored.nodes.find((node) => node.id === 'A');
+  const expectedPosition = resetLayout ? { x: 0, y: 0 } : { x: 999, y: 999 };
+
+  expect(participant?.position).toEqual(expectedPosition);
+  expect(participant?.data.style.backgroundColor).toBe('#123456');
+};
+
+describe('sequence appearance', () => {
+  test.each(['none', 'arrow', 'arrowclosed'] as const)(
+    'updates the selected start marker to %s and reports it in the toolkit',
+    expectSelectedMarker,
+  );
+  test.each([
+    ['A', '#f3f4f6', 'solid', 'solid'],
+    ['action-message-i0', '#ffffff', 'none', 'solid'],
+    ['note-n0', '#f9fafb', 'solid', 'solid'],
+    ['frame-alt', '#ffffff', 'dashed', 'solid'],
+    ['frame-rect-0', '#f9fafb', 'none', 'pattern-diagonal'],
+  ])(
+    'keeps role defaults for %s without baking them into saved styles',
+    expectSequenceRoleDefaults,
+  );
   test.each(['#123456', '#cccccc'])(
     'preserves an explicit %s override through hydration and rerender',
-    (primaryColor) => {
-      const edited = updateSelectedNodes(createElements(), ['A'], { primaryColor });
-      const hydrated = getTranslation(createTranslation(edited));
-      const restored = applySavedAppearance(createElements(), hydrated.elements);
-      const node = restored.nodes.find((item) => item.id === 'A');
-
-      expect(node?.data.style.backgroundColor).toBe(primaryColor);
-      expect(node?.data.styleVersion).toBe(1);
-      expect(getNodeFillValue(node, DEFAULT_SETTINGS)).toBe(primaryColor);
-    },
+    expectExplicitSequenceColor,
   );
-
-  test('removes legacy generated defaults but preserves custom colors without mutating the saved record', () => {
-    const elements = createElements();
-    const style = Object.assign({}, createNodeStyle(DEFAULT_SETTINGS), { color: '#123456' });
-    const nodes = elements.nodes.map((node) =>
-      Object.assign({}, node, {
-        data: Object.assign({}, node.data, { style, styleVersion: undefined }),
-      }),
-    );
-    const saved = createTranslation({ nodes, edges: elements.edges });
-    const before = structuredClone(saved);
-    const hydrated = getTranslation(saved);
-
-    hydrated.elements.nodes.forEach((node) => {
-      expect(node.data.style).toEqual({ color: '#123456' });
-      expect(node.data.styleVersion).toBe(1);
-    });
-    expect(saved).toEqual(before);
-  });
-
-  test.each([false, true])('preserves custom styles when resetLayout is %s', (resetLayout) => {
-    const fresh = createElements();
-    const edited = updateSelectedNodes(fresh, ['A'], { primaryColor: '#123456' });
-    const moved = edited.nodes.map((node) =>
-      Object.assign({}, node, { position: { x: 999, y: 999 } }),
-    );
-    const restored = applySavedAppearance(
-      fresh,
-      { nodes: moved, edges: edited.edges },
-      resetLayout,
-    );
-    const participant = restored.nodes.find((node) => node.id === 'A');
-    const expectedPosition = resetLayout ? { x: 0, y: 0 } : { x: 999, y: 999 };
-
-    expect(participant?.position).toEqual(expectedPosition);
-    expect(participant?.data.style.backgroundColor).toBe('#123456');
-  });
+  test.each([false, true])(
+    'preserves custom styles when resetLayout is %s',
+    expectSequenceStyleReset,
+  );
+  Object.entries(sequenceAppearanceCases).forEach(([name, run]) => test(name, run));
 });

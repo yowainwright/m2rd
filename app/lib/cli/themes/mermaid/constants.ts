@@ -1,7 +1,5 @@
 import type { MermaidConfig } from 'mermaid';
 
-// CLI SVG defaults. Edit these values and rebuild with pnpm run cli:build.
-// https://mermaid.js.org/config/theming.html
 export const svgTheme: MermaidConfig = {
   theme: 'base',
   look: 'classic',

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Effect } from 'effect';
@@ -55,7 +54,7 @@ test('exposes the SVG export in the interactive styleguide', async () => {
     STYLEGUIDE_VIEWPORT,
     { source: svgStyleguideSource(), path: STYLEGUIDE_EXPORT_PATH },
   );
-  const content = vi.mocked(showViewer).mock.calls[0][0];
+  const content = String(vi.mocked(showViewer).mock.calls[0][0]);
   expect(Math.max(...content.split('\n').map((line) => stringWidth(line)))).toBe(59);
 });
 
@@ -71,7 +70,7 @@ test.each(['pipe', 'CI'])('preserves requested width in a %s styleguide preview'
   vi.stubEnv('GITHUB_ACTIONS', '');
   await Effect.runPromise(runStyleguide({ width: 120, ascii: true }));
   const content = String(write.mock.calls[0][0]);
-  expect(content.indexOf('Mermaid')).toBeLessThan(content.indexOf('Colors'));
+  expect(content).toMatch(/Mermaid[\s\S]*Colors/);
   expect(Math.max(...content.split('\n').map((line) => stringWidth(line)))).toBe(120);
   expect(content).not.toMatch(/[\u2500-\u257f]/u);
   expect(showViewer).not.toHaveBeenCalled();

@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 import stringWidth from 'string-width';
 import type { Key } from 'ink';
 import { errorMessage, exportSvg } from '../utils';
-import type { TerminalInput, ViewerContext, ViewerEvent, ViewerSize } from './types';
+import type { TerminalInput, ViewerContext, ViewerEvent, ViewerProps, ViewerSize } from './types';
 
 export const viewerSize = (terminal: ViewerSize, viewport: ViewerSize = terminal) => {
   const columns = Math.min(terminal.columns, viewport.columns);
@@ -19,7 +19,20 @@ export const viewerStatusText = (context: ViewerContext) => {
   const position = `${column},${row} | ${context.contentWidth}x${context.contentHeight}`;
   const save = context.svgExport ? ' | s save SVG' : '';
   const details = context.message ?? position;
-  return `arrows / hjkl scroll${save} | q quit | ${details}`;
+  const multiple = (context.navigation?.items.length ?? 0) > 1;
+  const navigation = multiple ? 'p previous | n next | ' : '';
+  return `${navigation}arrows / hjkl scroll${save} | q quit | ${details}`;
+};
+
+export const viewerTitle = ({ navigation }: ViewerContext) => {
+  if (!navigation) return undefined;
+  const label = navigation.items[navigation.index].label;
+  return `${label} · diagram ${navigation.index + 1}/${navigation.items.length}`;
+};
+
+export const currentDiagram = ({ navigation }: ViewerContext, fallback: string) => {
+  if (!navigation) return fallback;
+  return navigation.items[navigation.index].diagram;
 };
 
 export const measureDiagram = (diagram: string) => {
@@ -36,10 +49,30 @@ const clampPosition = (context: ViewerContext, x: number, y: number) => {
   return { left, top };
 };
 
-export const viewportSize = (columns: number, rows: number) => {
+export const viewportSize = (columns: number, rows: number, header = false) => {
+  const reservedRows = header ? 3 : 2;
   const width = Math.max(1, columns - 1);
-  const height = Math.max(1, rows - 2);
+  const height = Math.max(1, rows - reservedRows);
   return { width, height };
+};
+
+export const viewerInput = (props: ViewerProps, dimensions: ViewerSize): ViewerContext => {
+  const { diagram, svgExport } = props;
+  const multiple = Array.isArray(diagram);
+  const drawing = multiple ? (diagram[0]?.diagram ?? '') : diagram;
+  const navigation = multiple ? { items: diagram, index: 0 } : undefined;
+  const size = measureDiagram(drawing);
+  const viewport = viewportSize(dimensions.columns, dimensions.rows, multiple);
+  return Object.assign({}, size, viewport, { left: 0, top: 0, svgExport, navigation });
+};
+
+const selectDiagram = (context: ViewerContext, offset: number) => {
+  const navigation = context.navigation;
+  if (!navigation) return {};
+  const index = navigation.index + offset;
+  const size = measureDiagram(navigation.items[index].diagram);
+  const selection = Object.assign({}, navigation, { index });
+  return Object.assign({}, size, { navigation: selection, left: 0, top: 0, message: undefined });
 };
 
 export const viewerSetup = setup({
@@ -57,8 +90,17 @@ export const viewerSetup = setup({
   },
   guards: {
     canSave: ({ context }) => Boolean(context.svgExport),
+    canPrevious: ({ context }) => (context.navigation?.index ?? 0) > 0,
+    canNext: ({ context }) => {
+      const navigation = context.navigation;
+      if (!navigation) return false;
+      const lastIndex = navigation.items.length - 1;
+      return navigation.index < lastIndex;
+    },
   },
   actions: {
+    previous: assign(({ context }) => selectDiagram(context, -1)),
+    next: assign(({ context }) => selectDiagram(context, 1)),
     saving: assign({ message: 'Saving SVG...' }),
     waitForSave: assign({ message: 'Saving SVG; wait to quit.' }),
     saved: assign(({ context }) => ({ message: `Saved ${context.svgExport?.path}` })),
@@ -74,8 +116,7 @@ export const viewerSetup = setup({
     }),
     resize: assign(({ context, event }) => {
       assertEvent(event, 'resize');
-      const width = event.width;
-      const height = event.height;
+      const { width, height } = event;
       const resized = Object.assign({}, context, { width, height });
       return Object.assign(resized, clampPosition(resized, context.left, context.top));
     }),
@@ -90,6 +131,8 @@ export const keyboardEvent = (input: string, key: Key, page: number): ViewerEven
   const modified = key.ctrl || key.meta || key.shift;
   if (modified) return undefined;
   if (input === 's') return { type: 'save' };
+  if (input === 'p') return { type: 'previous' };
+  if (input === 'n') return { type: 'next' };
   if (key.home) return { type: 'home' };
   if (key.end) return { type: 'end' };
   if (key.pageUp) return { type: 'scroll', x: 0, y: -page };
@@ -110,8 +153,6 @@ const openKeyboard = () => {
   try {
     return new ReadStream(fd);
   } finally {
-    // On Unix, libuv opens its own descriptor for the TTY stream.
-    // https://docs.libuv.org/en/v1.x/tty.html#c.uv_tty_init
     closeSync(fd);
   }
 };
@@ -121,7 +162,7 @@ const openTerminal = (): TerminalInput => {
   const owned = !process.stdin.isTTY;
   const stream = owned ? openKeyboard() : process.stdin;
   try {
-    const raw = stream.isRaw;
+    const { isRaw: raw } = stream;
     stream.setRawMode(true);
     stream.setRawMode(raw);
     return { stream, owned };

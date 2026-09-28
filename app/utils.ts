@@ -53,8 +53,6 @@ mermaid.initialize({
 const browserLogger = createBrowserLogger();
 const renderSemaphore = Effect.unsafeMakeSemaphore(1);
 
-export const getUpdatedAt = () => new Date().toISOString();
-
 export const toErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
   return 'The operation could not be completed.';
@@ -176,14 +174,16 @@ export const renderWorkspace = (context: AppContext) =>
     },
   }).pipe(Effect.uninterruptible, renderSemaphore.withPermits(1));
 
-const hasLegacySequenceElements = (records: GraphRecords) => {
+export const shouldRerenderWorkspace = (records: GraphRecords) => {
   const translation = records.translation;
   const isSequence = translation.diagramType === 'sequence';
   if (!isSequence) return false;
   const participantNodes = translation.elements.nodes.filter(
     (node) => node.data?.kind === 'sequence-participant',
   );
-  const hasLegacyHandles = participantNodes.some((node) => !Array.isArray(node.data?.handles));
+  const hasLegacyParticipants = participantNodes.some(
+    (node) => !Array.isArray(node.data?.handles) || node.data.styleVersion !== 1,
+  );
   const hasMessageEdges = translation.elements.edges.some(
     (edge) => edge.data?.kind === 'sequence-message',
   );
@@ -191,13 +191,9 @@ const hasLegacySequenceElements = (records: GraphRecords) => {
     (node) => node.data?.kind === 'sequence-action',
   );
   const hasLegacyMessages = hasMessageEdges && !hasActionNodes;
-  const hasLegacyStyles = participantNodes.some((node) => node.data.styleVersion !== 1);
-  const needsUpgrade = hasLegacyHandles || hasLegacyMessages || hasLegacyStyles;
+  const needsUpgrade = hasLegacyParticipants || hasLegacyMessages;
   return needsUpgrade;
 };
-
-export const shouldRerenderWorkspace = (records: GraphRecords) =>
-  hasLegacySequenceElements(records);
 
 export const exportWorkspace = (context: AppContext) =>
   Effect.tryPromise({
@@ -282,7 +278,7 @@ export const isCurrentDraft = (context: AppContext, draft: AppContext) => {
 };
 
 export const updateTranslation = (context: AppContext, update: Partial<GraphTranslation>) => {
-  const updatedAt = getUpdatedAt();
+  const updatedAt = new Date().toISOString();
   const translation = Object.assign({}, context.translation, update, { updatedAt });
   return { translation };
 };
@@ -326,9 +322,9 @@ export const updateNodeChanges = (
     : event.changes;
   const nodes = applyNodeChanges(changes, current);
   const remainingIds = new Set(getElementIds(nodes));
-  const edges = context.translation.elements.edges.filter((edge) => {
-    return remainingIds.has(edge.source) && remainingIds.has(edge.target);
-  });
+  const edges = context.translation.elements.edges.filter(
+    (edge) => remainingIds.has(edge.source) && remainingIds.has(edge.target),
+  );
   return updateTranslation(context, { elements: { nodes, edges } });
 };
 

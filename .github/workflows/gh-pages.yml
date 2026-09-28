@@ -22,7 +22,7 @@ jobs:
       bump: ${{ steps.revision.outputs.bump }}
     steps:
       - name: Checkout release history
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: main
           fetch-depth: 0
@@ -66,7 +66,7 @@ jobs:
       sha: ${{ steps.release.outputs.sha }}
     steps:
       - name: Checkout main
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: main
           fetch-depth: 0
@@ -77,7 +77,7 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$CHECKED_SHA"
 
       - name: Setup pnpm
-        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
           version: 12.2.1
           cache: true
@@ -96,7 +96,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           release_message=$(printf "chore(release): \${version}\n\nRelease-Source: %s" "$SOURCE_SHA")
-          # Required checks validate this revision before these local-only hooks are skipped.
           pnpm exec release-it patch --ci --no-hooks --git.push \
             --git.commitMessage="$release_message" \
             --git.pushArgs=--follow-tags --git.pushArgs=--atomic
@@ -113,13 +112,13 @@ jobs:
       pages: read
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: ${{ needs.release.outputs.sha || needs.revision.outputs.sha }}
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
           version: 12.2.1
           cache: true
@@ -139,10 +138,10 @@ jobs:
         run: pnpm run test:e2e
 
       - name: Configure Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         with:
           path: out
 
@@ -158,4 +157,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128

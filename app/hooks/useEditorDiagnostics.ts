@@ -14,9 +14,7 @@ export function useEditorDiagnostics() {
   });
   return useMemo(() => {
     const diagnostics = linter(
-      (view) => {
-        return Effect.runSync(getMermaidDiagnostics(view.state.doc, error));
-      },
+      (view) => Effect.runSync(getMermaidDiagnostics(view.state.doc, error)),
       { delay: 0 },
     );
     return [EDITOR_EXTENSIONS, diagnostics];

@@ -4,9 +4,7 @@ import { defaultTheme } from '@/app/lib/cli/themes/constants';
 import type { Theme, ThemeContextValue } from '@/app/components/ui/types';
 
 export const ThemeContext = React.createContext<ThemeContextValue>({
-  setTheme: () => {
-    // The default context keeps useTheme provider-optional.
-  },
+  setTheme: () => {},
   theme: defaultTheme,
 });
 

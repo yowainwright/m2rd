@@ -20,8 +20,6 @@ const text = (element: Element | null) => cleanText(element?.textContent ?? '');
 const joinedText = (element: Element, selector: string) =>
   Array.from(element.querySelectorAll(selector)).map(text).join(' ');
 
-// Follow app/graph/sequence: Mermaid SVG data-et/data-id attributes identify
-// participants and relationships without importing React Flow into the CLI.
 const readParticipants = (svg: Document): SequenceParticipant[] => {
   const lines = Array.from(svg.querySelectorAll('[data-et="life-line"]'));
   const positions = new Map(

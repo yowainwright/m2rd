@@ -42,8 +42,6 @@ export const ClassMetadataSchema = Schema.Struct({
 });
 export const ClassPointsSchema = Schema.Array(StatePointSchema).pipe(Schema.minItems(2));
 
-// Mermaid UML geometry rendered with React Flow's native custom-marker API.
-// https://github.com/mermaid-js/mermaid/blob/develop/packages/mermaid/src/rendering-util/rendering-elements/markers.js
 export const CLASS_MARKER_PATHS = {
   aggregation: 'M 18,7 L9,13 L1,7 L9,1 Z',
   composition: 'M 18,7 L9,13 L1,7 L9,1 Z',

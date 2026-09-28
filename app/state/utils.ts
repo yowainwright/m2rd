@@ -10,7 +10,6 @@ import {
   acceptSavedWorkspace,
   deleteWorkspace,
   exportWorkspace,
-  getUpdatedAt,
   isCurrentDraft,
   loadInitialWorkspace,
   loadWorkspace,
@@ -39,27 +38,27 @@ const actorSetup = setup({
     initialize: fromPromise<LoadedWorkspace>(({ signal }) =>
       runOperation(loadInitialWorkspace(), signal),
     ),
-    load: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) => {
-      return runOperation(loadWorkspace(input.loadRequest), signal);
-    }),
-    save: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) => {
-      return runOperation(saveWorkspace(input), signal).then((records) => ({
+    load: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+      runOperation(loadWorkspace(input.loadRequest), signal),
+    ),
+    save: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+      runOperation(saveWorkspace(input), signal).then((records) => ({
         records,
         draft: input,
-      }));
-    }),
-    rename: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) => {
-      return runOperation(renameWorkspace(input), signal);
-    }),
-    delete: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) => {
-      return runOperation(deleteWorkspace(input.workspace.id), signal);
-    }),
-    render: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) => {
-      return runOperation(renderWorkspace(input), signal);
-    }),
-    export: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) => {
-      return runOperation(exportWorkspace(input), signal);
-    }),
+      })),
+    ),
+    rename: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+      runOperation(renameWorkspace(input), signal),
+    ),
+    delete: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+      runOperation(deleteWorkspace(input.workspace.id), signal),
+    ),
+    render: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+      runOperation(renderWorkspace(input), signal),
+    ),
+    export: fromPromise(({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+      runOperation(exportWorkspace(input), signal),
+    ),
   },
   guards: {
     needsRender: ({ context }) => context.needsRender,
@@ -147,7 +146,7 @@ const documentSetup = layoutSetup.extend({
     }),
     updateInput: assign(({ context, event }) => {
       assertEvent(event, 'input.update');
-      const updatedAt = getUpdatedAt();
+      const updatedAt = new Date().toISOString();
       const input = Object.assign({}, context.input, { source: event.source, updatedAt });
       return { input, needsRender: true };
     }),
@@ -223,7 +222,7 @@ const titleSetup = documentSetup.extend({
       return { titleDraft: event.name, titleError: null };
     }),
     acceptDraftTitle: assign(({ context }) => {
-      const updatedAt = getUpdatedAt();
+      const updatedAt = new Date().toISOString();
       const name = context.titleDraft.trim();
       const workspace = Object.assign({}, context.workspace, { name, updatedAt });
       return { workspace, titleError: null };

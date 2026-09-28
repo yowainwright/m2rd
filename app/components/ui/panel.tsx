@@ -20,19 +20,20 @@ export interface PanelProps {
   'aria-label'?: string;
 }
 
-export const Panel = ({
-  title,
-  titleColor,
-  borderColor,
-  borderStyle,
-  bordered = true,
-  width,
-  height,
-  paddingX = 1,
-  paddingY = 0,
-  children,
-  'aria-label': ariaLabel,
-}: PanelProps) => {
+export const Panel = (props: PanelProps) => {
+  const {
+    title,
+    titleColor,
+    borderColor,
+    borderStyle,
+    bordered = true,
+    width,
+    height,
+    paddingX = 1,
+    paddingY = 0,
+    children,
+    'aria-label': ariaLabel,
+  } = props;
   const unicode = useUnicode();
   const theme = useTheme();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();

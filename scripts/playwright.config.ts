@@ -6,7 +6,6 @@ const outputDir = resolve(root, '.next/cache/playwright');
 const testDir = resolve(root, 'tests/e2e');
 const port = process.env.M2RD_PREVIEW_PORT || '54784';
 const baseURL = `http://127.0.0.1:${port}/m2rd/`;
-const chromium = devices['Desktop Chrome'];
 
 export default defineConfig({
   outputDir,
@@ -26,7 +25,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: chromium,
+      use: devices['Desktop Chrome'],
     },
   ],
 });

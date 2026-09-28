@@ -1,5 +1,19 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+
+const moveStateNode = async (page: Page, node: Locator) => {
+  const original = await node.getAttribute('style');
+  const bounds = await node.boundingBox();
+  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds!.x + bounds!.width / 2 + 35, bounds!.y + bounds!.height / 2 + 25, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect(node).not.toHaveAttribute('style', original!);
+  const moved = await node.getAttribute('style');
+  return moved;
+};
 
 const source = `stateDiagram-v2
     direction LR
@@ -198,16 +212,7 @@ test('moves, styles, locks, and restores native state nodes without editing sour
   const node = page.locator('.react-flow__node-stateNode').filter({ hasText: 'A' });
   await expect(node).toBeVisible();
   await page.getByRole('button', { name: 'fit view', exact: true }).click();
-  const original = await node.getAttribute('style');
-  const bounds = await node.boundingBox();
-  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(bounds!.x + bounds!.width / 2 + 35, bounds!.y + bounds!.height / 2 + 25, {
-    steps: 5,
-  });
-  await page.mouse.up();
-  await expect(node).not.toHaveAttribute('style', original!);
-  const moved = await node.getAttribute('style');
+  const moved = await moveStateNode(page, node);
   await node.click();
   await page.getByRole('button', { name: 'Toolkit: 1 node' }).click();
   await expect(page.getByLabel('Shape', { exact: true })).toHaveCount(0);

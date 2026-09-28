@@ -1,9 +1,8 @@
-// @vitest-environment node
 import { stripVTControlCharacters } from 'node:util';
 import { Effect } from 'effect';
 import * as ink from 'ink';
 import { afterEach, expect, test, vi } from 'vitest';
-import { renderDiagram } from '@/app/lib/cli';
+import { renderDiagram } from '@/app/lib/cli/utils';
 import { renderSequence } from '@/app/lib/cli/renders/sequence';
 import { renderMermaid } from '@/app/lib/cli/utils';
 

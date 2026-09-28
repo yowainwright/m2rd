@@ -10,8 +10,18 @@ export interface ViewerSvgExport {
   path: string;
 }
 
-export interface ViewerProps {
+export interface ViewerDiagram {
   diagram: string;
+  label: string;
+}
+
+export interface ViewerNavigation {
+  items: ViewerDiagram[];
+  index: number;
+}
+
+export interface ViewerProps {
+  diagram: string | ViewerDiagram[];
   ascii: boolean;
   viewport?: ViewerSize;
   svgExport?: ViewerSvgExport;
@@ -26,6 +36,7 @@ export interface ViewerContext {
   top: number;
   svgExport?: ViewerSvgExport;
   message?: string;
+  navigation?: ViewerNavigation;
 }
 
 export type ViewerEvent =
@@ -34,6 +45,8 @@ export type ViewerEvent =
   | { type: 'home' }
   | { type: 'end' }
   | { type: 'save' }
+  | { type: 'previous' }
+  | { type: 'next' }
   | { type: 'quit' };
 
 export interface TerminalInput {

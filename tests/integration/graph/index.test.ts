@@ -94,10 +94,7 @@ const input = {
 const deleteWorkspaces = async () => {
   const workspaces = await graphRepository.list();
   const workspaceIds = workspaces.map((workspace) => workspace.id);
-  const deletions = workspaceIds.map((workspaceId) => {
-    return graphRepository.delete(workspaceId);
-  });
-
+  const deletions = workspaceIds.map((workspaceId) => graphRepository.delete(workspaceId));
   await Promise.allSettled(deletions);
 };
 
@@ -148,61 +145,87 @@ const createWorkspaceControls = () => {
   return createElement(AppContext.Provider, { logic, children });
 };
 
-describe('graphRepository', () => {
-  afterEach(async () => {
-    cleanup();
-    vi.restoreAllMocks();
-    vi.useRealTimers();
-    await deleteWorkspaces();
-  });
+const task = {
+  id: 'gantt:build',
+  type: 'ganttTask',
+  position: { x: 75, y: 50 },
+  style: { width: 350, height: 20 },
+  draggable: false,
+  connectable: false,
+  deletable: false,
+  data: {
+    kind: 'gantt-task',
+    label: 'Build',
+    status: 'done',
+    start: '2026-09-21',
+    end: '2026-09-24',
+    parts: [{ kind: 'rect', style: { width: 350, height: 20 } }],
+    style: { backgroundColor: '#123456' },
+    sourceStyle: {},
+  },
+};
 
-  it('round-trips Gantt geometry, appearance, and fixed interaction flags across versions', async () => {
-    const task = {
-      id: 'gantt:build',
-      type: 'ganttTask',
-      position: { x: 75, y: 50 },
-      style: { width: 350, height: 20 },
-      draggable: false,
-      connectable: false,
-      deletable: false,
-      data: {
-        kind: 'gantt-task',
-        label: 'Build',
-        status: 'done',
-        start: '2026-09-21',
-        end: '2026-09-24',
-        parts: [{ kind: 'rect', style: { width: 350, height: 20 } }],
-        style: { backgroundColor: '#123456' },
-        sourceStyle: {},
-      },
-    };
-    const translation = Object.assign({}, input.translation, {
-      diagramType: 'gantt' as const,
-      elements: { nodes: [task], edges: [] },
-    });
-    const draft = Object.assign({}, input, {
-      input: { format: 'mermaid' as const, source: GANTT_SOURCE },
-      translation,
-    });
-    const first = await graphRepository.create(draft);
-    const nextTask = Object.assign({}, task, { style: { width: 400, height: 20 } });
-    const nextTranslation = Object.assign({}, translation, {
-      elements: { nodes: [nextTask], edges: [] },
-    });
-    await graphRepository.update({
-      input: { source: GANTT_SOURCE.replace('3d', '4d') },
-      translation: nextTranslation,
-      workspace: { id: first.workspace.id, name: 'Gantt history' },
-    });
-    const current = await graphRepository.read(first.workspace.id);
-    const previous = await graphRepository.read(first.workspace.id, first.input.id);
-    expect(current?.translation.elements.nodes).toEqual([nextTask]);
-    expect(previous?.translation.elements.nodes).toEqual([task]);
-    expect(previous?.translation.diagramType).toBe('gantt');
-    expect(previous?.input.source).toBe(GANTT_SOURCE);
-  });
+const updatedNodeStyle = Object.assign({}, node.style, {
+  backgroundColor: '#ef4444',
+});
+const updatedNode = Object.assign({}, node, {
+  position: { x: 120, y: 160 },
+  style: updatedNodeStyle,
+}) satisfies Node;
+const updatedEdgeStyle = Object.assign({}, edge.style, {
+  stroke: '#22c55e',
+  strokeWidth: 4,
+});
+const updatedEdge = Object.assign({}, edge, {
+  animated: true,
+  style: updatedEdgeStyle,
+}) satisfies Edge;
+const updatedSettings = Object.assign({}, settings, {
+  edgeColor: '#22c55e',
+  edgeWidth: 4,
+});
 
-  it('keeps the sidebar available before saving and after reload and deletion', async () => {
+const savedView = {
+  selection: {
+    edgeIds: ['edge-0'],
+    nodeIds: ['Idea'],
+  },
+  viewport: {
+    x: 8,
+    y: 13,
+    zoom: 1.4,
+  },
+};
+
+const graphRepositoryCases = {
+  'round-trips Gantt geometry, appearance, and fixed interaction flags across versions':
+    async () => {
+      const translation = Object.assign({}, input.translation, {
+        diagramType: 'gantt' as const,
+        elements: { nodes: [task], edges: [] },
+      });
+      const draft = Object.assign({}, input, {
+        input: { format: 'mermaid' as const, source: GANTT_SOURCE },
+        translation,
+      });
+      const first = await graphRepository.create(draft);
+      const nextTask = Object.assign({}, task, { style: { width: 400, height: 20 } });
+      const nextTranslation = Object.assign({}, translation, {
+        elements: { nodes: [nextTask], edges: [] },
+      });
+      await graphRepository.update({
+        input: { source: GANTT_SOURCE.replace('3d', '4d') },
+        translation: nextTranslation,
+        workspace: { id: first.workspace.id, name: 'Gantt history' },
+      });
+      const current = await graphRepository.read(first.workspace.id);
+      const previous = await graphRepository.read(first.workspace.id, first.input.id);
+      expect(current?.translation.elements.nodes).toEqual([nextTask]);
+      expect(previous?.translation.elements.nodes).toEqual([task]);
+      expect(previous?.translation.diagramType).toBe('gantt');
+      expect(previous?.input.source).toBe(GANTT_SOURCE);
+    },
+  'keeps the sidebar available before saving and after reload and deletion': async () => {
     const app = createWorkspaceControls();
     const ui = render(app);
     await waitFor(() =>
@@ -232,9 +255,8 @@ describe('graphRepository', () => {
     expect(reloaded.getByRole('navigation', { name: 'Saved graphs' })).toBeDefined();
     expect(reloaded.getByRole('button', { name: 'Toggle Sidebar' })).toBeDefined();
     expect(reloaded.getByText('No saved graphs yet')).toBeDefined();
-  });
-
-  it('keeps the sidebar available after a failed save and a successful retry', async () => {
+  },
+  'keeps the sidebar available after a failed save and a successful retry': async () => {
     const create = vi
       .spyOn(graphRepository, 'create')
       .mockRejectedValueOnce(new Error('Disk full'));
@@ -252,9 +274,8 @@ describe('graphRepository', () => {
     await waitFor(() => expect(ui.getByRole('button', { name: 'Saved' })).toBeDefined());
     expect(await graphRepository.list()).toHaveLength(1);
     expect(ui.queryByText('No saved graphs yet')).toBeNull();
-  });
-
-  it('commits with embedded Save and discards a draft when focus leaves the title group', async () => {
+  },
+  'commits with embedded Save and discards a draft when focus leaves the title group': async () => {
     const saved = await graphRepository.create(input);
     const header = createElement(SidebarProvider, null, createElement(WorkspaceHeader));
     const ui = render(createElement(AppContext.Provider, null, header));
@@ -283,9 +304,8 @@ describe('graphRepository', () => {
     expect((await graphRepository.read(saved.workspace.id))?.workspace.name).toBe(
       'Confirmed title',
     );
-  });
-
-  it('renames metadata without changing diagram records or versions', async () => {
+  },
+  'renames metadata without changing diagram records or versions': async () => {
     const saved = await graphRepository.create(input);
     await graphRepository.rename(saved.workspace.id, '  Release plan  ');
     const reloaded = await graphRepository.read(saved.workspace.id);
@@ -297,9 +317,8 @@ describe('graphRepository', () => {
       'Enter a graph name.',
     );
     await expect(graphRepository.rename('missing', 'Title')).rejects.toThrow('no longer exists');
-  });
-
-  it('keeps raw title drafts separate and discards cancelled or blank names', async () => {
+  },
+  'keeps raw title drafts separate and discards cancelled or blank names': async () => {
     const { actor, saved } = await startTitleEditor();
     act(() => actor.send({ type: 'workspace.rename', name: 'Release ' }));
     expect(actor.getSnapshot().context.titleDraft).toBe('Release ');
@@ -312,9 +331,8 @@ describe('graphRepository', () => {
     act(() => actor.send({ type: 'title.confirm' }));
     expect(actor.getSnapshot().matches({ title: 'idle' })).toBe(true);
     expect((await graphRepository.read(saved.workspace.id))?.workspace).toEqual(saved.workspace);
-  });
-
-  it('commits the title once, updates the sidebar and skips unchanged names', async () => {
+  },
+  'commits the title once, updates the sidebar and skips unchanged names': async () => {
     const { actor, saved } = await startTitleEditor();
     const rename = vi.spyOn(graphRepository, 'rename');
     act(() => actor.send({ type: 'workspace.rename', name: '  Release plan  ' }));
@@ -327,9 +345,8 @@ describe('graphRepository', () => {
     act(() => actor.send({ type: 'title.edit' }));
     act(() => actor.send({ type: 'title.confirm' }));
     expect(rename).toHaveBeenCalledTimes(1);
-  });
-
-  it('retains the title draft after a storage failure and allows retry', async () => {
+  },
+  'retains the title draft after a storage failure and allows retry': async () => {
     const { actor, saved } = await startTitleEditor();
     vi.spyOn(graphRepository, 'rename').mockRejectedValueOnce(new Error('Storage unavailable'));
     act(() => actor.send({ type: 'workspace.rename', name: 'Retry title' }));
@@ -344,9 +361,8 @@ describe('graphRepository', () => {
     act(() => actor.send({ type: 'title.confirm' }));
     await waitFor(() => expect(actor.getSnapshot().matches({ title: 'idle' })).toBe(true));
     expect((await graphRepository.read(saved.workspace.id))?.workspace.name).toBe('Retry title');
-  });
-
-  it('finishes a pending diagram save after the title is persisted', async () => {
+  },
+  'finishes a pending diagram save after the title is persisted': async () => {
     const { actor, saved } = await startTitleEditor();
     act(() => actor.send({ type: 'workspace.rename', name: 'Saved with title' }));
     act(() => actor.send({ type: 'title.confirm' }));
@@ -356,23 +372,22 @@ describe('graphRepository', () => {
     expect(reloaded?.workspace.name).toBe('Saved with title');
     expect(reloaded?.input.source).toBe(source);
     expect(actor.getSnapshot().context.afterRename).toBeNull();
-  });
+  },
+  'restores a saved graph through React StrictMode startup without reporting cancellation as a failure':
+    async () => {
+      const saved = await graphRepository.create(input);
+      const { result } = renderHook(() => AppContext.useSelector((state) => state.context), {
+        reactStrictMode: true,
+        wrapper: ({ children }) => createElement(AppContext.Provider, null, children),
+      });
 
-  it('restores a saved graph through React StrictMode startup without reporting cancellation as a failure', async () => {
-    const saved = await graphRepository.create(input);
-    const { result } = renderHook(() => AppContext.useSelector((state) => state.context), {
-      reactStrictMode: true,
-      wrapper: ({ children }) => createElement(AppContext.Provider, null, children),
-    });
-
-    await waitFor(() => expect(result.current.workspace.id).toBe(saved.workspace.id));
-    expect(result.current.operationError).toBeNull();
-    expect(result.current.workspaces).toHaveLength(1);
-    expect(result.current.input.id).toBe(saved.input.id);
-    expect(result.current.translation.elements.nodes).toHaveLength(1);
-  });
-
-  it('keeps five versions and saves the oldest as newest without changing other items', async () => {
+      await waitFor(() => expect(result.current.workspace.id).toBe(saved.workspace.id));
+      expect(result.current.operationError).toBeNull();
+      expect(result.current.workspaces).toHaveLength(1);
+      expect(result.current.input.id).toBe(saved.input.id);
+      expect(result.current.translation.elements.nodes).toHaveLength(1);
+    },
+  'keeps five versions and saves the oldest as newest without changing other items': async () => {
     const first = await createFiveVersions();
     const other = await graphRepository.create(input);
     const id = first.workspace.id;
@@ -386,24 +401,22 @@ describe('graphRepository', () => {
     expect((await graphRepository.read(id))?.input.source).toContain('%% edited');
     expect((await graphRepository.read(other.workspace.id))?.versions).toHaveLength(1);
     expect(await graphRepository.read(id, other.input.id)).toBeNull();
-  });
-
-  it('serializes concurrent saves even when their timestamps match', async () => {
+  },
+  'serializes concurrent saves even when their timestamps match': async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-09T12:00:00.000Z'));
     const first = await graphRepository.create(input);
-    const updates = Array.from({ length: 7 }, (_, index) => {
-      return saveVersion(first.workspace.id, `save ${index}`);
-    });
+    const updates = Array.from({ length: 7 }, (_, index) =>
+      saveVersion(first.workspace.id, `save ${index}`),
+    );
     const results = await Promise.allSettled(updates);
     expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
     const latest = await graphRepository.read(first.workspace.id);
     expect(latest?.versions.map((version) => version.version)).toEqual([8, 7, 6, 5, 4]);
     const timestamps = latest?.versions.map((version) => version.updatedAt);
     expect(new Set(timestamps).size).toBe(1);
-  });
-
-  it('rolls back a failed snapshot without pruning saved versions', async () => {
+  },
+  'rolls back a failed snapshot without pruning saved versions': async () => {
     const first = await createFiveVersions();
     const workspaceId = first.workspace.id;
     const before = await graphRepository.read(workspaceId);
@@ -422,9 +435,8 @@ describe('graphRepository', () => {
 
     expect(await graphRepository.read(workspaceId)).toEqual(before);
     expect(await graphRepository.read(workspaceId, first.input.id)).not.toBeNull();
-  });
-
-  it('prunes input and translation records and deletes every remaining version', async () => {
+  },
+  'prunes input and translation records and deletes every remaining version': async () => {
     const first = await createFiveVersions();
     const id = first.workspace.id;
     await saveVersion(id, 'version 6');
@@ -440,29 +452,9 @@ describe('graphRepository', () => {
     } finally {
       database.close();
     }
-  });
-
-  it('persists translation visual edits and view data', async () => {
+  },
+  'persists translation visual edits and view data': async () => {
     const records = await graphRepository.create(input);
-    const updatedNodeStyle = Object.assign({}, node.style, {
-      backgroundColor: '#ef4444',
-    });
-    const updatedNode = Object.assign({}, node, {
-      position: { x: 120, y: 160 },
-      style: updatedNodeStyle,
-    }) satisfies Node;
-    const updatedEdgeStyle = Object.assign({}, edge.style, {
-      stroke: '#22c55e',
-      strokeWidth: 4,
-    });
-    const updatedEdge = Object.assign({}, edge, {
-      animated: true,
-      style: updatedEdgeStyle,
-    }) satisfies Edge;
-    const updatedSettings = Object.assign({}, settings, {
-      edgeColor: '#22c55e',
-      edgeWidth: 4,
-    });
     const updated = await graphRepository.update({
       input: {
         source,
@@ -474,17 +466,7 @@ describe('graphRepository', () => {
         },
         error: null,
         settings: updatedSettings,
-        view: {
-          selection: {
-            edgeIds: ['edge-0'],
-            nodeIds: ['Idea'],
-          },
-          viewport: {
-            x: 8,
-            y: 13,
-            zoom: 1.4,
-          },
-        },
+        view: savedView,
       },
       workspace: {
         id: records.workspace.id,
@@ -503,7 +485,17 @@ describe('graphRepository', () => {
     expect(reloaded?.translation.elements.edges[0]?.style?.strokeWidth).toBe(4);
     expect(reloaded?.translation.view.selection?.nodeIds).toEqual(['Idea']);
     expect(reloaded?.translation.view.viewport?.zoom).toBe(1.4);
+  },
+};
+
+describe('graphRepository', () => {
+  afterEach(async () => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    await deleteWorkspaces();
   });
+  Object.entries(graphRepositoryCases).forEach(([name, run]) => it(name, run));
 });
 
 describe('node shapes', () => {
@@ -552,8 +544,7 @@ describe('node surfaces', () => {
   });
 });
 
-describe('sequence diagrams', () => {
-  const sequenceSvg = `<svg viewBox="0 0 450 306">
+const sequenceSvg = `<svg viewBox="0 0 450 306">
     <g data-et="participant" data-id="A"><rect class="actor actor-top" x="0" width="150" /><text class="actor actor-box">Alice</text></g>
     <g data-et="participant" data-id="B"><rect class="actor actor-top" x="200" width="150" /><text class="actor actor-box">Bob</text></g>
     <text class="messageText" y="80">Hello</text>
@@ -563,8 +554,8 @@ describe('sequence diagrams', () => {
     <text class="sequenceNumber">2</text>
     <path data-et="message" data-id="i1" class="messageLine0" d="M 76,165 C 136,155 136,195 76,185" marker-end="url(#arrowhead)" />
   </svg>`;
-
-  it('translates participants and message actions with row-level lifeline handles', () => {
+const sequenceDiagramsCases = {
+  'translates participants and message actions with row-level lifeline handles': () => {
     const elements = parseMermaidSvg(sequenceSvg, settings, 'sequence');
     const [firstNode, secondNode, messageAction, selfAction] = elements.nodes;
 
@@ -591,43 +582,42 @@ describe('sequence diagrams', () => {
       type: 'sequenceAction',
       data: { label: 'Think', sequenceNumber: '2' },
     });
-  });
+  },
+  'connects the sender through its action to the receiver and puts the arrowhead at the receiver':
+    () => {
+      const { edges } = parseMermaidSvg(sequenceSvg, settings, 'sequence');
+      const [senderSegment, receiverSegment] = edges;
 
-  it('connects the sender through its action to the receiver and puts the arrowhead at the receiver', () => {
-    const { edges } = parseMermaidSvg(sequenceSvg, settings, 'sequence');
-    const [senderSegment, receiverSegment] = edges;
-
-    expect(senderSegment).toMatchObject({
-      source: 'A',
-      target: 'action-message-i0',
-      type: 'sequenceMessage',
-      sourceHandle: 'message-i0-source-right',
-      targetHandle: 'left-target',
-      data: {
-        messageY: 115,
-        segment: 'source',
-        sequenceNumber: '1',
-        selfMessage: false,
-        markerEnd: false,
-      },
-    });
-    expect(receiverSegment).toMatchObject({
-      source: 'action-message-i0',
-      target: 'B',
-      type: 'sequenceMessage',
-      sourceHandle: 'right-source',
-      targetHandle: 'message-i0-target-left',
-      data: { messageY: 115, segment: 'target', selfMessage: false, markerEnd: true },
-    });
-    expect(senderSegment?.markerEnd).toBeUndefined();
-    expect(receiverSegment?.markerEnd).toMatchObject({
-      type: 'arrowclosed',
-      color: settings.edgeColor,
-    });
-    expect(receiverSegment?.data.sequenceNumber).toBeUndefined();
-  });
-
-  it('routes a self-message back to a separate handle on the same participant', () => {
+      expect(senderSegment).toMatchObject({
+        source: 'A',
+        target: 'action-message-i0',
+        type: 'sequenceMessage',
+        sourceHandle: 'message-i0-source-right',
+        targetHandle: 'left-target',
+        data: {
+          messageY: 115,
+          segment: 'source',
+          sequenceNumber: '1',
+          selfMessage: false,
+          markerEnd: false,
+        },
+      });
+      expect(receiverSegment).toMatchObject({
+        source: 'action-message-i0',
+        target: 'B',
+        type: 'sequenceMessage',
+        sourceHandle: 'right-source',
+        targetHandle: 'message-i0-target-left',
+        data: { messageY: 115, segment: 'target', selfMessage: false, markerEnd: true },
+      });
+      expect(senderSegment?.markerEnd).toBeUndefined();
+      expect(receiverSegment?.markerEnd).toMatchObject({
+        type: 'arrowclosed',
+        color: settings.edgeColor,
+      });
+      expect(receiverSegment?.data.sequenceNumber).toBeUndefined();
+    },
+  'routes a self-message back to a separate handle on the same participant': () => {
     const { edges } = parseMermaidSvg(sequenceSvg, settings, 'sequence');
     const [, , senderSegment, receiverSegment] = edges;
 
@@ -652,9 +642,8 @@ describe('sequence diagrams', () => {
       type: 'arrowclosed',
       color: settings.edgeColor,
     });
-  });
-
-  it('connects an unnumbered dashed reply from right to left', () => {
+  },
+  'connects an unnumbered dashed reply from right to left': () => {
     const svg = sequenceSvg.replace(
       '</svg>',
       `
@@ -687,8 +676,37 @@ describe('sequence diagrams', () => {
       sourceY: 240,
       targetY: 240,
     });
-  });
+  },
+  'keeps note geometry separate and attaches activation bars to their participant': () => {
+    const svg = sequenceSvg.replace(
+      '</svg>',
+      `
+      <g data-et="note" data-id="n0">
+        <rect class="note" x="300" y="120" width="100" height="40" />
+        <text class="noteText">Check cache</text>
+      </g>
+      <rect class="activation0" x="270" y="115" width="10" height="90" />
+      <rect class="activation1" x="275" y="135" width="10" height="30" />
+    </svg>`,
+    );
+    const { nodes } = parseMermaidSvg(svg, settings, 'sequence');
 
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    expect(byId.get('note-n0')).toMatchObject({
+      type: 'sequenceNote',
+      position: { x: 300, y: 120 },
+      style: { height: 40, width: 100 },
+      data: { label: 'Check cache' },
+    });
+    expect(byId.get('B')?.data.activations).toEqual([
+      { x: 70, y: 115, width: 10, height: 90 },
+      { x: 75, y: 135, width: 10, height: 30 },
+    ]);
+    expect(byId.get('A')?.data.activations).toEqual([]);
+  },
+};
+
+describe('sequence diagrams', () => {
   it.each(['alt', 'opt', 'loop'])(
     'retains %s frame bounds, conditions, and branch offsets',
     (frameType) => {
@@ -718,31 +736,5 @@ describe('sequence diagrams', () => {
       );
     },
   );
-
-  it('keeps note geometry separate and attaches activation bars to their participant', () => {
-    const svg = sequenceSvg.replace(
-      '</svg>',
-      `
-      <g data-et="note" data-id="n0">
-        <rect class="note" x="300" y="120" width="100" height="40" />
-        <text class="noteText">Check cache</text>
-      </g>
-      <rect class="activation0" x="270" y="115" width="10" height="90" />
-      <rect class="activation1" x="275" y="135" width="10" height="30" />
-    </svg>`,
-    );
-    const { nodes } = parseMermaidSvg(svg, settings, 'sequence');
-
-    expect(nodes.find((node) => node.id === 'note-n0')).toMatchObject({
-      type: 'sequenceNote',
-      position: { x: 300, y: 120 },
-      style: { height: 40, width: 100 },
-      data: { label: 'Check cache' },
-    });
-    expect(nodes.find((node) => node.id === 'B')?.data.activations).toEqual([
-      { x: 70, y: 115, width: 10, height: 90 },
-      { x: 75, y: 135, width: 10, height: 30 },
-    ]);
-    expect(nodes.find((node) => node.id === 'A')?.data.activations).toEqual([]);
-  });
+  Object.entries(sequenceDiagramsCases).forEach(([name, run]) => it(name, run));
 });

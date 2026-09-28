@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { Box, Text, renderToString } from 'ink';
-import { Effect } from 'effect';
+import { Array as EffectArray, Effect } from 'effect';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type { ElkPoint, ElkEdgeSection, ElkNode, ElkExtendedEdge } from 'elkjs';
 import { UnicodeContext } from '@/app/hooks/useUnicode';
@@ -21,8 +21,6 @@ const addConnection = (cells: Map<string, number>, point: ElkPoint, direction: n
   cells.set(key, connected);
 };
 
-// ELK JSON edge sections provide orthogonal start, bend, and end points.
-// https://eclipse.dev/elk/documentation/tooldevelopers/graphdatastructure/jsonformat.html
 const paintSegment = (cells: Map<string, number>, start: ElkPoint, end: ElkPoint) => {
   const dx = Math.sign(end.x - start.x);
   const dy = Math.sign(end.y - start.y);
@@ -178,12 +176,11 @@ const connectorElements = (layout: TerminalLayout, graph: FlowGraph, ascii: bool
 const drawFlowchart = (layout: TerminalLayout, graph: FlowGraph, options: CliOptions) => {
   const width = Math.ceil(layout.width);
   const height = Math.ceil(layout.height);
-  const frames = layout.children
-    .filter((node) => node.frame)
-    .map((node) => positionedPanel(node, options.ascii));
-  const nodes = layout.children
-    .filter((node) => !node.frame)
-    .map((node) => positionedPanel(node, options.ascii));
+  const [nodeLayouts, frameLayouts] = EffectArray.partition(layout.children, (node) =>
+    Boolean(node.frame),
+  );
+  const frames = frameLayouts.map((node) => positionedPanel(node, options.ascii));
+  const nodes = nodeLayouts.map((node) => positionedPanel(node, options.ascii));
   const connections = connectorElements(layout, graph, options.ascii);
   const children = frames.concat(connections, nodes, layout.edges.flatMap(positionedLabels));
   const junctions = portJunctions(layout, graph, options.ascii);
@@ -255,7 +252,6 @@ const readLayout = (layout: ElkNode, graph: FlowGraph): TerminalLayout => {
 
 const layoutFlowchart = async (graph: FlowGraph, options: CliOptions) => {
   const input = createLayoutInput(graph, options);
-  // Default ELK runs in-process; no workerUrl or background thread is created.
   const elk = new ELK();
   const result = await elk.layout(input);
   const layout = readLayout(result, graph);

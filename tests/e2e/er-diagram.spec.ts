@@ -39,12 +39,12 @@ relationships.forEach(({ syntax, start, end, dash }) => {
     await expect(page.locator('[data-er-entity="Alias"]')).toBeVisible();
     const path = page.locator('.react-flow__edge-erRelation .react-flow__edge-path');
     await expect(path).toHaveCSS('stroke-dasharray', dash);
-    const markers = await path.evaluate((element) => {
-      return ['marker-start', 'marker-end'].map((attribute) => {
+    const markers = await path.evaluate((element) =>
+      ['marker-start', 'marker-end'].map((attribute) => {
         const id = element.getAttribute(attribute)!.slice(5, -1);
         return document.getElementById(id)?.getAttribute('data-er-marker');
-      });
-    });
+      }),
+    );
     expect(markers).toEqual([start, end]);
   });
 });
@@ -108,7 +108,9 @@ test('keeps parallel and self relationships distinct after source reordering', a
     items.map((item) => item.getAttribute('data-testid')),
   );
   expect(new Set(ids).size).toBe(4);
-  await expect(edges.filter({ hasText: 'recursive' })).toHaveCount(1);
+  await expect(page.locator('.react-flow__edge-erRelation', { hasText: 'recursive' })).toHaveCount(
+    1,
+  );
 });
 
 [

@@ -32,9 +32,9 @@ database
   .stores({
     [GRAPH_TABLES.inputs]: 'id, workspaceId, updatedAt, [workspaceId+version]',
   })
-  .upgrade((transaction) => {
-    return transaction.table(GRAPH_TABLES.inputs).toCollection().modify({ version: 1 });
-  });
+  .upgrade((transaction) =>
+    transaction.table(GRAPH_TABLES.inputs).toCollection().modify({ version: 1 }),
+  );
 
 const readInputs = (workspaceId: string) => {
   const lower = [workspaceId, Dexie.minKey];
@@ -128,7 +128,8 @@ export const graphRepository: GraphRepository = {
     });
   },
   list() {
-    return database.workspaces.orderBy('updatedAt').reverse().toArray();
+    const workspaces = database.workspaces.orderBy('updatedAt').reverse();
+    return workspaces.toArray();
   },
   read(workspaceId, versionId) {
     return database.transaction('r', tables, () => readRecords(workspaceId, versionId));

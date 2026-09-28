@@ -8,13 +8,21 @@ import { errorMessage } from '../utils';
 import { VIEWER_MACHINE } from './constants';
 import {
   keyboardEvent,
-  measureDiagram,
+  currentDiagram,
   terminalInput,
+  viewerInput,
   viewerSize,
   viewerStatusText,
+  viewerTitle,
   viewportSize,
 } from './utils';
-import type { ViewerContext, ViewerProps, ViewerSize, ViewerSvgExport } from './types';
+import type {
+  ViewerContext,
+  ViewerDiagram,
+  ViewerProps,
+  ViewerSize,
+  ViewerSvgExport,
+} from './types';
 
 const viewerContents = (diagram: string, context: ViewerContext) => {
   const { width, height, contentWidth, contentHeight, left: scrollLeft, top: scrollTop } = context;
@@ -38,14 +46,19 @@ const viewerStatus = (context: ViewerContext) => {
 
 const viewerScreen = (diagram: string, context: ViewerContext, size: ViewerSize) => {
   const { columns, rows } = size;
-  const small = columns < 2 || rows < 3;
+  const minimumRows = context.navigation ? 4 : 3;
+  const small = columns < 2 || rows < minimumRows;
   const contents = small
     ? createElement(Text, { wrap: 'truncate-end' }, 'Resize terminal; q quits')
     : viewerContents(diagram, context);
   const status = small ? null : viewerStatus(context);
+  const title = viewerTitle(context);
+  const showHeading = title && !small;
+  const heading = showHeading ? createElement(Text, { wrap: 'truncate-end' }, title) : null;
   return createElement(
     Box,
     { width: columns, height: rows, flexDirection: 'column', overflow: 'hidden' },
+    heading,
     contents,
     status,
   );
@@ -56,9 +69,12 @@ const Viewer = ({ diagram, ascii, viewport, svgExport }: ViewerProps) => {
   const dimensions = viewerSize(terminal, viewport);
   const { columns, rows } = dimensions;
   const { exit } = useApp();
-  const size = useMemo(() => measureDiagram(diagram), [diagram]);
-  const { width, height } = viewportSize(columns, rows);
-  const input = Object.assign({}, size, { width, height, left: 0, top: 0, svgExport });
+  const header = Array.isArray(diagram);
+  const { width, height } = viewportSize(columns, rows, header);
+  const input = useMemo(
+    () => viewerInput({ diagram, ascii, svgExport }, { columns, rows }),
+    [diagram, ascii, svgExport, columns, rows],
+  );
   const [snapshot, send] = useMachine(VIEWER_MACHINE, { input });
   useEffect(() => {
     send({ type: 'resize', width, height });
@@ -70,13 +86,15 @@ const Viewer = ({ diagram, ascii, viewport, svgExport }: ViewerProps) => {
     const event = keyboardEvent(input, key, snapshot.context.height);
     if (event) send(event);
   });
-  const screen = viewerScreen(diagram, snapshot.context, dimensions);
+  const fallback = typeof diagram === 'string' ? diagram : '';
+  const drawing = currentDiagram(snapshot.context, fallback);
+  const screen = viewerScreen(drawing, snapshot.context, dimensions);
   const value = { unicode: !ascii };
   return createElement(UnicodeContext.Provider, { value }, screen);
 };
 
 export const showViewer = (
-  diagram: string,
+  diagram: string | ViewerDiagram[],
   ascii: boolean,
   viewport?: ViewerSize,
   svgExport?: ViewerSvgExport,
