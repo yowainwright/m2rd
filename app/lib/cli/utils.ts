@@ -4,6 +4,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { createElement } from 'react';
 import { Text, renderToString } from 'ink';
 import { Effect } from 'effect';
+import type { Either } from 'effect';
 import { Lexer } from 'marked';
 import type { Token, Tokens } from 'marked';
 import { Panel } from '@/app/components/ui/panel';
@@ -228,19 +229,29 @@ export const renderDiagram = (source: string, options: CliOptions) =>
     }),
   );
 
-const renderDocumentDiagram = (
-  { source, label }: CliDiagram,
-  options: CliOptions,
-  recover: boolean,
-) =>
+const renderDocumentDiagram = ({ source, label }: CliDiagram, options: CliOptions) =>
   renderDiagram(source, options).pipe(
     Effect.mapError((error) => `${label}: ${error}`),
-    Effect.catchAll((error) => {
-      if (!recover) return Effect.fail(error);
-      return Effect.succeed(`Unable to render diagram:\n${error}`);
-    }),
-    Effect.map((diagram) => ({ diagram, label })),
+    Effect.either,
+    Effect.map((result) => ({ result, label })),
   );
+
+const presentRenderedDiagrams = (
+  rendered: { result: Either.Either<string, string>; label: string }[],
+  ascii: boolean,
+) => {
+  const failures = rendered.flatMap(({ result }) => {
+    if (result._tag === 'Left') return [result.left];
+    return [];
+  });
+  if (failures.length === rendered.length) return Effect.fail(failures.join('\n'));
+  const views = rendered.map(({ result, label }) => {
+    const diagram =
+      result._tag === 'Right' ? result.right : `Unable to render diagram:\n${result.left}`;
+    return { diagram, label };
+  });
+  return showViewer(views, ascii);
+};
 
 const presentDiagrams = (diagrams: CliDiagram[], options: CliOptions) => {
   if (options.output) {
@@ -248,10 +259,9 @@ const presentDiagrams = (diagrams: CliDiagram[], options: CliOptions) => {
       return Effect.fail('--output requires exactly one diagram. Provide a single Mermaid block.');
     return exportSvg(diagrams[0].source, options.output);
   }
-  const multiple = diagrams.length > 1;
-  return Effect.forEach(diagrams, (diagram) => renderDocumentDiagram(diagram, options, multiple), {
+  return Effect.forEach(diagrams, (diagram) => renderDocumentDiagram(diagram, options), {
     concurrency: 1,
-  }).pipe(Effect.flatMap((rendered) => showViewer(rendered, options.ascii)));
+  }).pipe(Effect.flatMap((rendered) => presentRenderedDiagrams(rendered, options.ascii)));
 };
 
 export const runCli = (paths: string | string[] | undefined, options: CliOptions) =>

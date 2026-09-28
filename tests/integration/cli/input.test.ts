@@ -102,6 +102,28 @@ const markdown = (text: string) => `# Example\n\n\`\`\`mermaid\n${text}\n\`\`\`\
 test.each([
   ['malformed', 'flowchart TD\n A[unterminated', 'Parse error'],
   ['unsupported', 'classDiagram\n A --> B', 'does not support'],
+])('rejects batches containing only %s blocks', async (_kind, invalid, message) => {
+  stdin([markdown(invalid), markdown(invalid)]);
+  await expect(Effect.runPromise(runCli(undefined, options))).rejects.toThrow(message);
+  expect(showViewer).not.toHaveBeenCalled();
+});
+
+test('reports every failed file when no diagram renders', async () => {
+  const malformed = resolve(directory, 'malformed.md');
+  const unsupported = resolve(directory, 'unsupported.md');
+  writeFileSync(malformed, markdown('flowchart TD\n A[unterminated'));
+  writeFileSync(unsupported, markdown('classDiagram\n A --> B'));
+  const result = await Effect.runPromise(Effect.either(runCli([malformed, unsupported], options)));
+  expect(result).toMatchObject({ _tag: 'Left', left: expect.stringContaining(malformed) });
+  expect(result).toMatchObject({ left: expect.stringContaining(unsupported) });
+  expect(result).toMatchObject({ left: expect.stringContaining('Parse error') });
+  expect(result).toMatchObject({ left: expect.stringContaining('does not support') });
+  expect(showViewer).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['malformed', 'flowchart TD\n A[unterminated', 'Parse error'],
+  ['unsupported', 'classDiagram\n A --> B', 'does not support'],
 ])('keeps valid diagrams viewable around %s blocks', async (_kind, invalid, message) => {
   stdin([markdown(invalid), markdown(source), markdown(invalid), markdown(source)]);
   await Effect.runPromise(runCli(undefined, options));
