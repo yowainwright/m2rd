@@ -16,7 +16,7 @@ In the terminal, it provides a cli which renders diagrams via a tui.
 
 To use the web app, just go to https://jeffry.in/m2rd/.
 
-> jeffry.in is my personal site; all posted in [Github](<>) if you're curious (or for security purposes).
+> jeffry.in is my personal site; all posted in [GitHub](https://github.com/yowainwright/yowainwright.github.io) if you're curious (or for security purposes).
 
 You can use it locally if you would like by cloning the project, running install, and run dev.
 See the [npm scripts](https://github.com/yowainwright/m2rd/blob/main/package.json#L21-L65) if you want the exact scripts.

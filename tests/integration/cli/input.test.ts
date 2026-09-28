@@ -99,6 +99,22 @@ test('does not create an SVG file when piped input is malformed', async () => {
 
 const markdown = (text: string) => `# Example\n\n\`\`\`mermaid\n${text}\n\`\`\`\n`;
 
+test.each([
+  ['malformed', 'flowchart TD\n A[unterminated', 'Parse error'],
+  ['unsupported', 'classDiagram\n A --> B', 'does not support'],
+])('keeps valid diagrams viewable around %s blocks', async (_kind, invalid, message) => {
+  stdin([markdown(invalid), markdown(source), markdown(invalid), markdown(source)]);
+  await Effect.runPromise(runCli(undefined, options));
+  const failed = {
+    label: 'stdin',
+    diagram: expect.stringContaining(`Unable to render diagram:\nstdin: `),
+  };
+  const rendered = { label: 'stdin', diagram: expect.stringContaining('Read input') };
+  expect(showViewer).toHaveBeenCalledExactlyOnceWith([failed, rendered, failed, rendered], false);
+  const [diagrams] = vi.mocked(showViewer).mock.calls[0];
+  expect(diagrams[0]).toMatchObject({ diagram: expect.stringContaining(message) });
+});
+
 test('extracts Mermaid from piped Markdown and ignores other fenced code', async () => {
   stdin(['# Examples\n\n```js\nnot a diagram\n```\n', markdown(source)]);
   await Effect.runPromise(runCli(undefined, options));

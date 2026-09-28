@@ -228,10 +228,18 @@ export const renderDiagram = (source: string, options: CliOptions) =>
     }),
   );
 
-const renderDocumentDiagram = ({ source, label }: CliDiagram, options: CliOptions) =>
+const renderDocumentDiagram = (
+  { source, label }: CliDiagram,
+  options: CliOptions,
+  recover: boolean,
+) =>
   renderDiagram(source, options).pipe(
-    Effect.map((diagram) => ({ diagram, label })),
     Effect.mapError((error) => `${label}: ${error}`),
+    Effect.catchAll((error) => {
+      if (!recover) return Effect.fail(error);
+      return Effect.succeed(`Unable to render diagram:\n${error}`);
+    }),
+    Effect.map((diagram) => ({ diagram, label })),
   );
 
 const presentDiagrams = (diagrams: CliDiagram[], options: CliOptions) => {
@@ -240,7 +248,8 @@ const presentDiagrams = (diagrams: CliDiagram[], options: CliOptions) => {
       return Effect.fail('--output requires exactly one diagram. Provide a single Mermaid block.');
     return exportSvg(diagrams[0].source, options.output);
   }
-  return Effect.forEach(diagrams, (diagram) => renderDocumentDiagram(diagram, options), {
+  const multiple = diagrams.length > 1;
+  return Effect.forEach(diagrams, (diagram) => renderDocumentDiagram(diagram, options, multiple), {
     concurrency: 1,
   }).pipe(Effect.flatMap((rendered) => showViewer(rendered, options.ascii)));
 };
