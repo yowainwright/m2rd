@@ -1,5 +1,90 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+
+const moveClassNode = async (page: Page, node: Locator) => {
+  const before = await node.getAttribute('style');
+  const edge = page.locator('.react-flow__edge-path');
+  const path = await edge.getAttribute('d');
+  const bounds = await node.boundingBox();
+  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds!.x + bounds!.width / 2 + 30, bounds!.y + bounds!.height / 2 + 25, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect(node).not.toHaveAttribute('style', before!);
+  await expect(edge).not.toHaveAttribute('d', path!);
+  const moved = await node.getAttribute('style');
+  return moved;
+};
+
+const expectClassGeometry = async (page: Page) => {
+  const markers = page.locator('marker[data-class-marker]');
+  await expect(markers.locator('[fill]')).toHaveCount(9);
+  const paths = page.locator('.react-flow__edge-path');
+  await expect(
+    paths.locator('xpath=..').filter({ has: page.locator('marker[data-class-marker="lollipop"]') }),
+  ).toHaveCount(1);
+  const geometry = await page.locator('.react-flow__node').evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      const hasSize = rect.width > 0 && rect.height > 0;
+      const invalid = node.getAttribute('style')?.includes('NaN');
+      const valid = hasSize && !invalid;
+      return valid;
+    }),
+  );
+  expect(geometry.every(Boolean)).toBe(true);
+  const references = await paths.evaluateAll((elements) => {
+    const references = elements.flatMap((element) => [
+      element.getAttribute('marker-start'),
+      element.getAttribute('marker-end'),
+    ]);
+    return references.filter(Boolean).map((reference) => {
+      const id = decodeURIComponent(reference!.slice(5, -1));
+      return document.getElementById(id)?.tagName === 'marker';
+    });
+  });
+  expect(references).toHaveLength(9);
+  expect(references.every(Boolean)).toBe(true);
+};
+
+const expectClassMembers = async (page: Page) => {
+  const generic = page.locator('.react-flow__node[data-id="class:A"]');
+  await expect(generic).toContainText('A<T>');
+  await expect(generic).toContainText('«interface»');
+  await expect(generic).toContainText('+T value');
+  await expect(generic).toContainText('-int count');
+  await expect(generic).toContainText('#String label');
+  await expect(generic).toContainText('~bool active');
+  await expect(generic.getByText('+get() : T', { exact: true })).toHaveCSS('font-style', 'italic');
+  await expect(generic.getByText('+create() : A', { exact: true })).toHaveCSS(
+    'text-decoration-line',
+    'underline',
+  );
+  await expect(generic.locator('[data-class-shape]')).toHaveCSS(
+    'background-color',
+    'rgb(255, 204, 204)',
+  );
+  await expect(page.locator('[data-id="class:B"] [data-class-shape]')).toHaveCSS(
+    'background-color',
+    'rgb(204, 255, 204)',
+  );
+  await expect(page.locator('[data-id="class:B"] [data-class-shape]')).toHaveCSS(
+    'border-top-width',
+    '3px',
+  );
+};
+
+const nested = `classDiagram
+    namespace Outer {
+      namespace Inner {
+        class A
+      }
+      class B
+    }
+    A --> B
+`;
 
 const source = `classDiagram
     direction LR
@@ -81,58 +166,8 @@ test('guards the real Mermaid class metadata and SVG contract', async ({ page },
   await expect(page.locator('[data-class-shape="note"]')).toHaveText('Generic contract');
   await expect(page.locator('[data-class-shape="interface"]')).toHaveText('Port');
   await expect(page.locator('.react-flow__edge-classRelation')).toHaveCount(11);
-  const generic = page.locator('.react-flow__node[data-id="class:A"]');
-  await expect(generic).toContainText('A<T>');
-  await expect(generic).toContainText('«interface»');
-  await expect(generic).toContainText('+T value');
-  await expect(generic).toContainText('-int count');
-  await expect(generic).toContainText('#String label');
-  await expect(generic).toContainText('~bool active');
-  await expect(generic.getByText('+get() : T', { exact: true })).toHaveCSS('font-style', 'italic');
-  await expect(generic.getByText('+create() : A', { exact: true })).toHaveCSS(
-    'text-decoration-line',
-    'underline',
-  );
-  await expect(generic.locator('[data-class-shape]')).toHaveCSS(
-    'background-color',
-    'rgb(255, 204, 204)',
-  );
-  await expect(page.locator('[data-id="class:B"] [data-class-shape]')).toHaveCSS(
-    'background-color',
-    'rgb(204, 255, 204)',
-  );
-  await expect(page.locator('[data-id="class:B"] [data-class-shape]')).toHaveCSS(
-    'border-top-width',
-    '3px',
-  );
-  const markers = page.locator('marker[data-class-marker]');
-  await expect(markers.locator('[fill]')).toHaveCount(9);
-  const paths = page.locator('.react-flow__edge-path');
-  await expect(
-    paths.locator('xpath=..').filter({ has: page.locator('marker[data-class-marker="lollipop"]') }),
-  ).toHaveCount(1);
-  const geometry = await page.locator('.react-flow__node').evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const rect = node.getBoundingClientRect();
-      const hasSize = rect.width > 0 && rect.height > 0;
-      const invalid = node.getAttribute('style')?.includes('NaN');
-      const valid = hasSize && !invalid;
-      return valid;
-    }),
-  );
-  expect(geometry.every(Boolean)).toBe(true);
-  const references = await paths.evaluateAll((elements) => {
-    const references = elements.flatMap((element) => [
-      element.getAttribute('marker-start'),
-      element.getAttribute('marker-end'),
-    ]);
-    return references.filter(Boolean).map((reference) => {
-      const id = decodeURIComponent(reference!.slice(5, -1));
-      return document.getElementById(id)?.tagName === 'marker';
-    });
-  });
-  expect(references).toHaveLength(9);
-  expect(references.every(Boolean)).toBe(true);
+  await expectClassMembers(page);
+  await expectClassGeometry(page);
   await page.getByRole('button', { name: 'fit view', exact: true }).click();
   const fits = () =>
     page.locator('.react-flow').evaluate((canvas) => {
@@ -157,19 +192,7 @@ test('keeps class semantics, movement, and appearance through save, reload, and 
   const node = page.locator('.react-flow__node[data-id="class:A"]');
   await expect(node).toBeVisible();
   await page.getByRole('button', { name: 'fit view', exact: true }).click();
-  const before = await node.getAttribute('style');
-  const edge = page.locator('.react-flow__edge-path');
-  const path = await edge.getAttribute('d');
-  const bounds = await node.boundingBox();
-  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(bounds!.x + bounds!.width / 2 + 30, bounds!.y + bounds!.height / 2 + 25, {
-    steps: 5,
-  });
-  await page.mouse.up();
-  await expect(node).not.toHaveAttribute('style', before!);
-  await expect(edge).not.toHaveAttribute('d', path!);
-  const moved = await node.getAttribute('style');
+  const moved = await moveClassNode(page, node);
   await node.click();
   await page.getByRole('button', { name: 'Toolkit: 1 node' }).click();
   await expect(page.getByLabel('Shape', { exact: true })).toHaveCount(0);
@@ -204,15 +227,6 @@ test('honors nested and compact namespaces and direction with fresh source geome
   page,
 }) => {
   await page.goto('./');
-  const nested = `classDiagram
-    namespace Outer {
-      namespace Inner {
-        class A
-      }
-      class B
-    }
-    A --> B
-`;
   await updateSource(page, nested);
   await expect(page.locator('[data-class-shape="namespace"]')).toHaveCount(2);
   const geometry = await page
@@ -266,7 +280,9 @@ test('keeps parallel relation appearance attached to its meaning after insertion
   await expect(edges).toHaveCount(4);
   await expect(owned).toHaveAttribute('data-testid', originalId!);
   await expect(owned.locator('.react-flow__edge-path')).toHaveCSS('stroke', 'rgb(239, 68, 68)');
-  const others = edges.filter({ hasNotText: 'owns' }).locator('.react-flow__edge-path');
+  const others = page
+    .locator('.react-flow__edge-classRelation', { hasNotText: 'owns' })
+    .locator('.react-flow__edge-path');
   await expect(others.nth(0)).not.toHaveCSS('stroke', 'rgb(239, 68, 68)');
   await expect(others.nth(1)).not.toHaveCSS('stroke', 'rgb(239, 68, 68)');
   await expect(others.nth(2)).not.toHaveCSS('stroke', 'rgb(239, 68, 68)');

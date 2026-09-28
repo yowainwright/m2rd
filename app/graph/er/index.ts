@@ -23,13 +23,19 @@ import type {
   ErNodeData,
 } from './types';
 
-const createErEdge = (
-  edge: ErMetadataEdge,
-  id: string,
-  ids: ReadonlyMap<string, string>,
-  points: ErEdgeData['points'],
-  settings: TranslationSettings,
-): Edge<ErEdgeData> => {
+const createErEdge = ({
+  edge,
+  id,
+  ids,
+  points,
+  settings,
+}: {
+  edge: ErMetadataEdge;
+  id: string;
+  ids: ReadonlyMap<string, string>;
+  points: ErEdgeData['points'];
+  settings: TranslationSettings;
+}): Edge<ErEdgeData> => {
   const source = ids.get(edge.start)!;
   const target = ids.get(edge.end)!;
   const label = decodeClassLabel(edge.label);
@@ -57,13 +63,19 @@ const createErEdge = (
   };
 };
 
-const createErEdges = (
-  graphics: ErGraphics,
-  id: string,
-  metadata: ErMetadata,
-  ids: ReadonlyMap<string, string>,
-  settings: TranslationSettings,
-) => {
+const createErEdges = ({
+  graphics,
+  id,
+  metadata,
+  ids,
+  settings,
+}: {
+  graphics: ErGraphics;
+  id: string;
+  metadata: ErMetadata;
+  ids: ReadonlyMap<string, string>;
+  settings: TranslationSettings;
+}) => {
   const occurrences = new Map<string, number>();
   const edges = new Map<string, Edge<ErEdgeData>>();
   metadata.edges.forEach((edge) => {
@@ -72,7 +84,7 @@ const createErEdges = (
     occurrences.set(key, ordinal + 1);
     const edgeId = `er-edge:${encodeURIComponent(JSON.stringify([key, ordinal]))}`;
     const points = readErPoints(graphics, `${id}-${edge.id}`);
-    edges.set(edgeId, createErEdge(edge, edgeId, ids, points, settings));
+    edges.set(edgeId, createErEdge({ edge, id: edgeId, ids, points, settings }));
   });
   return Array.from(edges.values());
 };
@@ -138,7 +150,7 @@ const createErElements = (
     return [ids.get(node.id)!, geometry] as const;
   });
   const geometry = new Map(entries);
-  const edges = createErEdges(graphics, id, metadata, ids, settings);
+  const edges = createErEdges({ graphics, id, metadata, ids, settings });
   const handles = createErHandles(edges, geometry);
   const nodes = entries.map(([nodeId, shape]) => createErNode(nodeId, shape, handles, settings));
   return { nodes, edges };
@@ -151,8 +163,6 @@ export const renderErDiagram = async (
 ) => {
   const host = createLayoutHost(id, settings.fontFamily);
   try {
-    // ER metadata supplies original names; public SVG rendering supplies styles and layout.
-    // ER IDs are deterministic for the same source and are checked when joining geometry.
     const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
     const db = diagram.db;
     const getData = 'getData' in db ? db.getData : undefined;

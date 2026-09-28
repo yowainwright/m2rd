@@ -1,3 +1,4 @@
+import type { TranslationSettings } from '../types';
 import type { CSSProperties } from 'react';
 import type { Schema } from 'effect';
 import type { Position } from 'reactflow';
@@ -30,3 +31,11 @@ export type StateEdgeData = {
   arrow: boolean;
   dashed: boolean;
 };
+
+export interface StateNodeOptions {
+  node: StateLayoutNode;
+  ids: Map<string, string>;
+  nodes: Map<string, StateLayoutNode>;
+  handles: Map<string, StateHandle[]>;
+  settings: TranslationSettings;
+}

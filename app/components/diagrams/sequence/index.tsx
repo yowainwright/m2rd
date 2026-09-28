@@ -103,24 +103,9 @@ export function SequenceParticipantNode({ data, id }: NodeProps<SequenceParticip
   );
 }
 
-export function SequenceMessageEdge({
-  data,
-  interactionWidth,
-  markerEnd,
-  markerStart,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  style,
-}: EdgeProps<SequenceMessageData>) {
-  const path = getMessagePath(
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    data?.selfMessage === true && data.segment === 'target',
-  );
+export function SequenceMessageEdge(props: EdgeProps<SequenceMessageData>) {
+  const { data, interactionWidth, markerEnd, markerStart, sourceX, sourceY, style } = props;
+  const path = getMessagePath(props, data?.selfMessage === true && data.segment === 'target');
   const edgeStyle = data?.dashed ? Object.assign({}, style, { strokeDasharray: '6 4' }) : style;
 
   return (
@@ -161,7 +146,6 @@ function MessageSequenceNumber({
 const actionHandleStyle = SEQUENCE_HANDLE_STYLE;
 
 export function SequenceActionNode({ data }: NodeProps<SequenceActionData>) {
-  const style = data.style;
   const title = [data.sequenceNumber, data.label].filter(Boolean).join(' ');
   return (
     <>
@@ -169,7 +153,7 @@ export function SequenceActionNode({ data }: NodeProps<SequenceActionData>) {
       <Handle id="left-source" position={Position.Left} style={actionHandleStyle} type="source" />
       <div
         className="flex h-full w-full -translate-y-1/2 items-end justify-center whitespace-nowrap bg-transparent px-1 pb-1 text-base text-gray-900"
-        style={style}
+        style={data.style}
         title={title}
       >
         {data.label}
@@ -191,11 +175,10 @@ export function SequenceActionNode({ data }: NodeProps<SequenceActionData>) {
 }
 
 export function SequenceNoteNode({ data }: NodeProps<SequenceNoteData>) {
-  const style = data.style;
   return (
     <div
       className="h-full w-full rounded-sm border border-gray-200 bg-gray-50 p-2 text-sm text-gray-900"
-      style={style}
+      style={data.style}
     >
       {data.label}
     </div>

@@ -22,8 +22,6 @@ export const readGanttTasks = (value: unknown) => {
   return tasks;
 };
 
-// Mermaid's parseData retains raw.data: optional tags, then [id,] start, end.
-// Match the explicit ID field; its spelling cannot distinguish it from taskN IDs.
 export const ganttTaskKey = (task: GanttTask) => {
   const fields = task.raw.data.replace(/^:/, '').split(',');
   const explicit = fields.length >= 3 && fields.at(-3)?.trim() === task.id;

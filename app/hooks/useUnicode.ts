@@ -19,8 +19,8 @@ const detectUnicodeSupport = (): boolean => {
     return true;
   }
 
-  const noUnicode = getEnv('NO_UNICODE');
-  const disabled = noUnicode === '1' || noUnicode === 'true';
+  const unicodeOptOut = getEnv('NO_UNICODE');
+  const disabled = unicodeOptOut === '1' || unicodeOptOut === 'true';
   if (disabled) {
     return false;
   }

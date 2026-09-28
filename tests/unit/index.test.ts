@@ -117,7 +117,7 @@ it('keeps edits made during saving and renders the newer draft after saving comp
   actor.send({ type: 'workspace.save' });
   await vi.waitFor(() => expect(save).toHaveBeenCalledOnce());
   actor.send({ type: 'input.update', source: 'flowchart LR; New --> Draft' });
-  const draft = save.mock.calls[0][0].input;
+  const { input: draft } = save.mock.calls[0][0];
   pending.resolve({ records, draft });
   await waitUntilReady(actor);
   const { context } = actor.getSnapshot();

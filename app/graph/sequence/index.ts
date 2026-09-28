@@ -219,13 +219,19 @@ const getNearestParticipant = (participants: SequenceParticipantRecord[], x: num
   }, null);
 };
 
-const createSequenceNode = (
-  participant: SequenceParticipantRecord,
-  height: number,
-  activations: SequenceActivation[],
-  handles: SequenceParticipantHandle[],
-  settings: TranslationSettings,
-): Node<SequenceParticipantData> => {
+const createSequenceNode = ({
+  participant,
+  height,
+  activations,
+  handles,
+  settings,
+}: {
+  participant: SequenceParticipantRecord;
+  height: number;
+  activations: SequenceActivation[];
+  handles: SequenceParticipantHandle[];
+  settings: TranslationSettings;
+}): Node<SequenceParticipantData> => {
   const appearanceStyle = createSequenceStyle(settings);
   const frameStyle = {
     height,
@@ -371,15 +377,23 @@ const createSequenceFrameNode = (
   };
 };
 
-const createSequenceMessageRecord = (
-  element: Element,
-  label: string,
-  index: number,
-  participants: SequenceParticipantRecord[],
-  participantsById: Map<string, SequenceParticipantRecord>,
-  point: SequenceMessagePoint,
-  sequenceNumber?: string,
-): SequenceMessageRecord => {
+const createSequenceMessageRecord = ({
+  element,
+  label,
+  index,
+  participants,
+  participantsById,
+  point,
+  sequenceNumber,
+}: {
+  element: Element;
+  label: string;
+  index: number;
+  participants: SequenceParticipantRecord[];
+  participantsById: Map<string, SequenceParticipantRecord>;
+  point: SequenceMessagePoint;
+  sequenceNumber?: string;
+}): SequenceMessageRecord => {
   const sourceId = element.getAttribute('data-from');
   const targetId = element.getAttribute('data-to');
   const source =
@@ -480,15 +494,15 @@ const readSequenceMessages = (svg: SVGSVGElement, participants: SequenceParticip
     const point = readSequenceMessagePoint(element);
     if (!point) return [];
     return [
-      createSequenceMessageRecord(
+      createSequenceMessageRecord({
         element,
-        labels[index] || '',
+        label: labels[index] || '',
         index,
         participants,
         participantsById,
         point,
-        sequenceNumbers[index],
-      ),
+        sequenceNumber: sequenceNumbers[index],
+      }),
     ];
   });
 };
@@ -509,13 +523,13 @@ export const parseSequenceSvg = (
     createSequenceNoteNode(note, settings),
   );
   const participantNodes: Node[] = participants.map((participant) =>
-    createSequenceNode(
+    createSequenceNode({
       participant,
       height,
-      activationMap.get(participant.id) || [],
-      handleMap.get(participant.id) || [],
+      activations: activationMap.get(participant.id) || [],
+      handles: handleMap.get(participant.id) || [],
       settings,
-    ),
+    }),
   );
   const actionNodes = messages.map((message) => createSequenceActionNode(message, settings));
   const edges = messages.flatMap((message) => [

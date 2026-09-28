@@ -417,8 +417,8 @@ const updateEdgeMarker = (
   color: string,
 ) => {
   const isSequence = edge.data?.kind === SEQUENCE_MESSAGE_KIND;
-  const hasNoSequenceMarker = isSequence && !edge.data?.[key];
-  if (hasNoSequenceMarker) return undefined;
+  const hasMarker = !isSequence || Boolean(edge.data?.[key]);
+  if (!hasMarker) return undefined;
   if (value === undefined) return colorEdgeMarker(edge[key], color);
   return createEdgeMarker(value, color);
 };
@@ -631,19 +631,9 @@ export const getEdgeTypeValue = (
     return settings.edgeType;
   }
 
-  if (edge.type === SURGE_EDGE_TYPE) {
-    const edgeType = edge.data?.edgeType;
-    const option = EDGE_TYPE_OPTIONS.find((item) => item.value === edgeType);
-    return option?.value || settings.edgeType;
-  }
-
-  if (edge.type === SEQUENCE_MESSAGE_EDGE_TYPE) {
-    const edgeType = edge.data?.edgeType;
-    const option = EDGE_TYPE_OPTIONS.find((item) => item.value === edgeType);
-    return option?.value || settings.edgeType;
-  }
-
-  const option = EDGE_TYPE_OPTIONS.find((item) => item.value === edge.type);
+  const hasCustomType = edge.type === SURGE_EDGE_TYPE || edge.type === SEQUENCE_MESSAGE_EDGE_TYPE;
+  const edgeType = hasCustomType ? edge.data?.edgeType : edge.type;
+  const option = EDGE_TYPE_OPTIONS.find((item) => item.value === edgeType);
 
   return option?.value || settings.edgeType;
 };
@@ -685,8 +675,9 @@ const getNodeCenter = (node: Node) => {
 };
 
 export const getEdgeAnchor = (edge: Edge, nodes: Node[]) => {
-  const source = nodes.find((node) => node.id === edge.source);
-  const target = nodes.find((node) => node.id === edge.target);
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const source = byId.get(edge.source);
+  const target = byId.get(edge.target);
 
   if (!source) {
     return null;
@@ -710,9 +701,9 @@ export const applySettings = (
   elements: GraphElements,
   settings: Partial<TranslationSettings>,
 ): GraphElements => {
-  const nodes = elements.nodes.map((node) => {
-    return applyNodeStyle(node, createNodeStyleUpdate(node, settings));
-  });
+  const nodes = elements.nodes.map((node) =>
+    applyNodeStyle(node, createNodeStyleUpdate(node, settings)),
+  );
   const edges = elements.edges.map((edge) => createEdgeUpdate(edge, settings));
 
   return { nodes, edges };

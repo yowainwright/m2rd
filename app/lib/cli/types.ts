@@ -4,6 +4,11 @@ export interface CliOptions {
   output?: string;
 }
 
+export interface CliDiagram {
+  source: string;
+  label: string;
+}
+
 export interface RenderedMermaid {
   family: 'flowchart' | 'sequence' | 'state';
   svg: Document;

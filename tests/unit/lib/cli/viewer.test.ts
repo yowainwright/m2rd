@@ -1,10 +1,16 @@
-// @vitest-environment node
 import { createActor, fromPromise, waitFor } from 'xstate';
 import { expect, test, vi } from 'vitest';
 import type { Key } from 'ink';
 import { VIEWER_MACHINE } from '@/app/lib/cli/viewer/constants';
 import type { ViewerContext } from '@/app/lib/cli/viewer/types';
-import { keyboardEvent, measureDiagram, viewerStatusText } from '@/app/lib/cli/viewer/utils';
+import {
+  currentDiagram,
+  keyboardEvent,
+  measureDiagram,
+  viewerInput,
+  viewerStatusText,
+  viewerTitle,
+} from '@/app/lib/cli/viewer/utils';
 
 const key: Key = {
   upArrow: false,
@@ -48,6 +54,44 @@ test('maps paging and quit keys', () => {
   expect(keyboardEvent('q', key, 20)).toEqual({ type: 'quit' });
   expect(keyboardEvent('c', ctrl, 20)).toEqual({ type: 'quit' });
   expect(keyboardEvent('h', ctrl, 20)).toBeUndefined();
+});
+
+test('maps n and p to diagram navigation without accepting modified keys', () => {
+  const ctrl = Object.assign({}, key, { ctrl: true });
+  expect(keyboardEvent('n', key, 20)).toEqual({ type: 'next' });
+  expect(keyboardEvent('p', key, 20)).toEqual({ type: 'previous' });
+  expect(keyboardEvent('n', ctrl, 20)).toBeUndefined();
+  expect(keyboardEvent('p', ctrl, 20)).toBeUndefined();
+});
+
+test('navigates diagrams, stops at boundaries, and resets scroll for the selected drawing', () => {
+  const diagrams = [
+    { label: 'README.md', diagram: 'Long first diagram\nrow 2\nrow 3' },
+    { label: 'docs/other.md', diagram: 'Small' },
+  ];
+  const input = viewerInput({ diagram: diagrams, ascii: false }, { columns: 10, rows: 4 });
+  expect(input).toMatchObject({ width: 9, height: 1 });
+  const actor = createActor(VIEWER_MACHINE, { input }).start();
+  try {
+    actor.send({ type: 'previous' });
+    expect(actor.getSnapshot().context.navigation?.index).toBe(0);
+    actor.send({ type: 'scroll', x: 5, y: 1 });
+    expect(actor.getSnapshot().context).toMatchObject({ left: 5, top: 1 });
+    actor.send({ type: 'next' });
+    actor.send({ type: 'next' });
+    const context = actor.getSnapshot().context;
+    expect(context.navigation?.index).toBe(1);
+    expect(context).toMatchObject({ contentWidth: 5, contentHeight: 1, left: 0, top: 0 });
+    expect(currentDiagram(context, '')).toBe('Small');
+    expect(viewerTitle(context)).toBe('docs/other.md · diagram 2/2');
+    expect(viewerStatusText(context)).toContain('p previous | n next');
+    expect(viewerStatusText(context)).toContain('arrows / hjkl scroll');
+    actor.send({ type: 'previous' });
+    expect(currentDiagram(actor.getSnapshot().context, '')).toContain('Long first diagram');
+    expect(actor.getSnapshot().context).toMatchObject({ contentHeight: 3, left: 0, top: 0 });
+  } finally {
+    actor.stop();
+  }
 });
 
 test('clamps both scroll axes and reclamps when the viewport grows', () => {

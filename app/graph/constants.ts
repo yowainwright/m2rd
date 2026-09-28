@@ -53,7 +53,6 @@ export const SEQUENCE_RIGHT_HANDLE_STYLE: CSSProperties = Object.assign({}, SEQU
   left: 'calc(50% - 1px)',
 });
 
-// Color inputs need hex values corresponding to the Tailwind defaults.
 export const SEQUENCE_NODE_DEFAULTS: Record<
   string,
   { fill: string; border: NodeBorder; surface: NodeSurface }

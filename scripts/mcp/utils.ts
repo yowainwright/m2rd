@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Effect } from 'effect';
 import {
@@ -33,10 +33,10 @@ export const createMcpFiles = (root = resolve(import.meta.dirname, '../..')): Ge
 };
 
 const writeMcpFile = (root: string, file: GeneratedFile) => {
-  return Effect.tryPromise(async () => {
+  return Effect.try(() => {
     const destination = resolve(root, file.path);
-    await mkdir(dirname(destination), { recursive: true });
-    await writeFile(destination, file.content, 'utf8');
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, file.content, 'utf8');
   });
 };
 

@@ -15,6 +15,8 @@ export const VIEWER_MACHINE = viewerSetup.createMachine({
     viewing: {
       on: {
         save: { guard: 'canSave', target: 'saving' },
+        previous: { guard: 'canPrevious', actions: 'previous' },
+        next: { guard: 'canNext', actions: 'next' },
       },
     },
     saving: {

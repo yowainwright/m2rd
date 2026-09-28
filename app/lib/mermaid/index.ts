@@ -2,8 +2,6 @@ import { Effect } from 'effect';
 import type { Diagnostic } from '@codemirror/lint';
 import type { EditorView } from '@codemirror/view';
 
-// Match Mermaid's preprocessing so parser lines map back to the original source.
-// https://github.com/mermaid-js/mermaid/blob/develop/packages/mermaid/src/preprocess.ts
 const REMOVED_SOURCE = [
   /^([^\S\n\r]*)-{3}\s*[\n\r]([\s\S]*?)[\n\r]\1-{3}\s*[\n\r]+/g,
   /%{2}{\s*(?:(\w+)\s*:|(\w+))\s*(?:(\w+)|((?:(?!}%{2}).|\r?\n)*))?\s*(?:}%{2})?/gi,
@@ -14,9 +12,9 @@ const REMOVED_SOURCE = [
 const removeSource = (source: string, offsets: number[], pattern: RegExp) => {
   const matches = Array.from(source.matchAll(pattern));
   const removed = new Set(
-    matches.flatMap((match) => {
-      return Array.from({ length: match[0].length }, (_, index) => match.index + index);
-    }),
+    matches.flatMap((match) =>
+      Array.from({ length: match[0].length }, (_, index) => match.index + index),
+    ),
   );
   const remaining = offsets.filter((_, index) => !removed.has(index));
   return { source: source.replace(pattern, ''), offsets: remaining };

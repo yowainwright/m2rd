@@ -1,3 +1,4 @@
+import type { GanttTaskOptions } from './types';
 import { Array as EffectArray } from 'effect';
 import mermaid from 'mermaid';
 import type { Node } from 'reactflow';
@@ -51,14 +52,14 @@ const createGanttNode = (
   };
 };
 
-const createGanttTask = (
-  svg: SVGSVGElement,
-  renderId: string,
-  task: GanttTask,
-  id: string,
-  ambiguousIdentity: boolean,
-  settings: TranslationSettings,
-) => {
+const createGanttTask = ({
+  svg,
+  renderId,
+  task,
+  id,
+  ambiguousIdentity,
+  settings,
+}: GanttTaskOptions) => {
   const shape = requireGanttGraphic(svg.getElementById(`${renderId}-${task.id}`));
   const text = requireGanttGraphic(svg.getElementById(`${renderId}-${task.id}-text`));
   const incompatible = shape.tagName !== 'rect' || text.tagName !== 'text';
@@ -124,7 +125,7 @@ export const createGanttElements = (
     const ambiguous = entries.length > 1;
     return entries.map((task, ordinal) => {
       const id = `gantt:${encodeURIComponent(JSON.stringify([key, ordinal]))}`;
-      return createGanttTask(svg, renderId, task, id, ambiguous, settings);
+      return createGanttTask({ svg, renderId, task, id, ambiguousIdentity: ambiguous, settings });
     });
   };
   const nodes = Object.entries(groups).flatMap(createGroup);
@@ -139,8 +140,6 @@ export const renderGanttDiagram = async (
   const host = createLayoutHost(id, settings.fontFamily);
   host.style.width = `${GANTT_LAYOUT_WIDTH}px`;
   try {
-    // The public renderer owns scheduling and layout. Guard the internal DB just
-    // as ER does; never infer dates from pixels or parse Mermaid ourselves.
     const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
     const db = diagram.db;
     const getTasks = 'getTasks' in db ? db.getTasks : undefined;

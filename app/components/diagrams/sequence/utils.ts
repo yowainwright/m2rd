@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { EdgeProps } from 'reactflow';
 import { createDiagonalPatternImage } from '@/app/graph';
 import { NODE_PATTERN_SIZE } from '@/app/graph/constants';
 import type { SequenceFrameData } from '@/app/graph/types';
@@ -18,10 +19,12 @@ export const getHeaderStyle = (style: CSSProperties | undefined): CSSProperties 
 });
 
 export const getMessagePath = (
-  sourceX: number,
-  sourceY: number,
-  targetX: number,
-  targetY: number,
+  {
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+  }: Pick<EdgeProps, 'sourceX' | 'sourceY' | 'targetX' | 'targetY'>,
   selfMessage: boolean,
 ) => {
   if (!selfMessage) return `M ${sourceX},${sourceY} L ${targetX},${targetY}`;

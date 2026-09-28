@@ -59,9 +59,8 @@ const frameColumn = (
   if (!participants.length) throw new Error(`Missing participants for ${frame.label}.`);
   const parents = frames.filter((parent) => parent.top < frame.top && parent.bottom > frame.bottom);
   const inset = Math.min(parents.length, 2);
-  const first = participants[0];
   const last = participants[participants.length - 1];
-  const column = first.left - 2 + inset;
+  const column = participants[0].left - 2 + inset;
   const width = last.left + last.width + 2 - inset - column;
   return Object.assign({}, frame, { column, width });
 };
@@ -92,8 +91,9 @@ const labelSlots = (left: number, width: number, columns: ParticipantColumn[]) =
 
 const labelSlot = (row: SequenceRow, left: number, width: number, columns: ParticipantColumn[]) => {
   const slots = labelSlots(left, width, columns);
-  const source = columns.find((column) => column.id === row.message?.from);
-  const target = columns.find((column) => column.id === row.message?.to);
+  const byId = new Map(columns.map((column) => [column.id, column]));
+  const source = byId.get(row.message?.from || '');
+  const target = byId.get(row.message?.to || '');
   const anchor = source && target ? Math.min(source.center, target.center) + 2 : undefined;
   const preferred = slots.find((slot) => slot.left === anchor);
   if (preferred) return preferred;
@@ -121,13 +121,19 @@ const rowDimensions = (
   return Object.assign({}, slot, { labelHeight, height, containerLeft, containerWidth });
 };
 
-const positionRows = (
-  graph: SequenceGraph,
-  frames: FrameColumn[],
-  width: number,
-  header: number,
-  columns: ParticipantColumn[],
-) => {
+const positionRows = ({
+  graph,
+  frames,
+  width,
+  header,
+  columns,
+}: {
+  graph: SequenceGraph;
+  frames: FrameColumn[];
+  width: number;
+  header: number;
+  columns: ParticipantColumn[];
+}) => {
   const measured = sequenceRows(graph).map((row) => {
     const dimensions = rowDimensions(row, frames, width, columns);
     return Object.assign({}, row, dimensions);
@@ -152,8 +158,11 @@ const participantJunction = (column: ParticipantColumn, ascii: boolean, height: 
   const glyph = ascii ? '+' : '┬';
   const text = createElement(Text, { color: 'cyan' }, glyph);
   const top = height - 1;
-  const left = column.center;
-  return createElement(Box, { key: `join-${column.id}`, position: 'absolute', top, left }, text);
+  return createElement(
+    Box,
+    { key: `join-${column.id}`, position: 'absolute', top, left: column.center },
+    text,
+  );
 };
 
 const positionedFrame = (frame: FrameColumn, rows: Map<string, PositionedRow>, ascii: boolean) => {
@@ -192,13 +201,19 @@ const frameCrossings = (
   return new Set(boundaries);
 };
 
-const lifeline = (
-  column: ParticipantColumn,
-  top: number,
-  height: number,
-  crossings: Set<number | undefined>,
-  ascii: boolean,
-) => {
+const lifeline = ({
+  column,
+  top,
+  height,
+  crossings,
+  ascii,
+}: {
+  column: ParticipantColumn;
+  top: number;
+  height: number;
+  crossings: Set<number | undefined>;
+  ascii: boolean;
+}) => {
   const vertical = ascii ? '|' : '│';
   const crossing = ascii ? '+' : '┼';
   const lines = Array.from({ length: height - top }, (_, index) => {
@@ -206,10 +221,9 @@ const lifeline = (
     return crossings.has(y) ? crossing : vertical;
   });
   const text = createElement(Text, { dimColor: true }, lines.join('\n'));
-  const left = column.center;
   return createElement(
     Box,
-    { key: `line-${column.id}`, position: 'absolute', top, left, width: 1 },
+    { key: `line-${column.id}`, position: 'absolute', top, left: column.center, width: 1 },
     text,
   );
 };
@@ -219,13 +233,19 @@ const messageStroke = (message: SequenceMessage, ascii: boolean) => {
   return ascii ? '-' : SOLID_LINE;
 };
 
-const messageLine = (
-  message: SequenceMessage,
-  source: number,
-  target: number,
-  centers: Set<number>,
-  ascii: boolean,
-) => {
+const messageLine = ({
+  message,
+  source,
+  target,
+  centers,
+  ascii,
+}: {
+  message: SequenceMessage;
+  source: number;
+  target: number;
+  centers: Set<number>;
+  ascii: boolean;
+}) => {
   const right = ascii ? '>' : '▶';
   const left = ascii ? '<' : '◀';
   const stroke = messageStroke(message, ascii);
@@ -274,7 +294,7 @@ const positionedMessage = (
   const centers = new Set(Array.from(columns.values(), (column) => column.center));
   const line = self
     ? selfMessage(message, ascii)
-    : messageLine(message, source.center, target.center, centers, ascii);
+    : messageLine({ message, source: source.center, target: target.center, centers, ascii });
   const left = Math.min(source.center, target.center);
   const top = row.top + row.labelHeight;
   const text = createElement(Text, null, line);
@@ -320,7 +340,7 @@ const layoutSequence = (graph: SequenceGraph, options: CliOptions): SequenceLayo
         .length,
   );
   const header = Math.max(...headers);
-  const rows = positionRows(graph, frames, options.width, header, columns);
+  const rows = positionRows({ graph, frames, width: options.width, header, columns });
   const last = rows.at(-1);
   const height = last ? last.top + last.height : header;
   if (height * options.width > MAX_RENDER_CELLS)
@@ -334,7 +354,13 @@ const sequenceElements = (layout: SequenceLayout, ascii: boolean) => {
   const participants = new Map(columns.map((column) => [column.id, column]));
   const panels: ReactNode[] = frames.map((frame) => positionedFrame(frame, byId, ascii));
   const lines = columns.map((column) =>
-    lifeline(column, header, height, frameCrossings(column, frames, byId), ascii),
+    lifeline({
+      column,
+      top: header,
+      height,
+      crossings: frameCrossings(column, frames, byId),
+      ascii,
+    }),
   );
   const headings = columns.map((column) => positionedPanel(column, ascii, header));
   const junctions = columns.map((column) => participantJunction(column, ascii, header));

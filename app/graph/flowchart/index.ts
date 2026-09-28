@@ -18,9 +18,7 @@ const getNodeId = (domId: string) => {
 };
 
 const getClassValue = (element: Element, prefix: string) => {
-  const token = Array.from(element.classList).find((className) => {
-    return className.startsWith(prefix);
-  });
+  const token = Array.from(element.classList).find((className) => className.startsWith(prefix));
 
   return token?.slice(prefix.length);
 };
@@ -89,13 +87,19 @@ const createFlowNode = (
   };
 };
 
-const createFlowEdge = (
-  edge: Element,
-  index: number,
-  nodes: FlowNodeRecord[],
-  settings: TranslationSettings,
-  endpointMap: Map<string, string>,
-): Edge => {
+const createFlowEdge = ({
+  edge,
+  index,
+  nodes,
+  settings,
+  endpointMap,
+}: {
+  edge: Element;
+  index: number;
+  nodes: FlowNodeRecord[];
+  settings: TranslationSettings;
+  endpointMap: Map<string, string>;
+}): Edge => {
   const edgeIdEndpoints = getEdgeIdEndpoints(edge);
   const source = getClassValue(edge, 'LS-') || edgeIdEndpoints.source;
   const target = getClassValue(edge, 'LE-') || edgeIdEndpoints.target;
@@ -127,9 +131,9 @@ const createFlowEdges = (
   settings: TranslationSettings,
 ) => {
   const endpointMap = createEndpointMap(nodes);
-  return Array.from(svg.querySelectorAll(EDGE_SELECTOR)).map((edge, index) => {
-    return createFlowEdge(edge, index, nodes, settings, endpointMap);
-  });
+  return Array.from(svg.querySelectorAll(EDGE_SELECTOR)).map((edge, index) =>
+    createFlowEdge({ edge, index, nodes, settings, endpointMap }),
+  );
 };
 
 export const parseFlowchartSvg = (

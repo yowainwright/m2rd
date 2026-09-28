@@ -50,7 +50,6 @@ const requireGraphic = (element: Element | null | undefined): SVGGraphicsElement
   return element;
 };
 
-// Same SVG coordinate conversion used by the class adapter; keep Mermaid's measured layout.
 const readBounds = (element: SVGGraphicsElement): ErFrame => {
   const box = element.getBBox();
   const root = element.ownerSVGElement?.getCTM();
@@ -151,10 +150,9 @@ export const readErGeometry = (
     color,
     fontFamily: getComputedStyle(element).fontFamily,
   });
-  const label = cells[0].text;
   const data = {
     kind: 'er-node' as const,
-    label,
+    label: cells[0].text,
     attributes: node.attributes,
     cells,
     rows,
@@ -172,7 +170,7 @@ export const readErPoints = (graphics: ErGraphics, id: string) => {
     const decoded = Schema.decodeUnknownEither(ErPointsSchema)(JSON.parse(atob(encoded)));
     if (decoded._tag === 'Right') return decoded.right;
   } catch {
-    // Report incompatible route data at the adapter boundary.
+    throw erCompatibilityError();
   }
   throw erCompatibilityError();
 };

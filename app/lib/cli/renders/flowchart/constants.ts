@@ -41,7 +41,6 @@ export const LAYOUT_OPTIONS = {
   'elk.layered.spacing.edgeEdgeBetweenLayers': '2',
 };
 
-// Clockwise connection bits: north=1, east=2, south=4, west=8.
 export const LINE_GLYPHS: Record<number, string> = {
   0: ' ',
   1: '│',

@@ -1,6 +1,5 @@
 import { Effect } from 'effect';
-import { renderDiagram } from '../index';
-import { errorMessage, exportSvg } from '../utils';
+import { errorMessage, exportSvg, renderDiagram } from '../utils';
 import { showViewer } from '../viewer';
 import type { CliOptions } from '../types';
 import { STYLEGUIDE_EXAMPLE, STYLEGUIDE_EXPORT_PATH, STYLEGUIDE_VIEWPORT } from './constants';

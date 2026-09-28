@@ -1,3 +1,4 @@
+import type { TranslationSettings } from '../types';
 import type { Schema } from 'effect';
 import type { CSSProperties } from 'react';
 import type { GanttTaskSchema } from './constants';
@@ -22,3 +23,12 @@ export type GanttNodeData = {
   sourceStyle: CSSProperties;
   style: CSSProperties;
 };
+
+export interface GanttTaskOptions {
+  svg: SVGSVGElement;
+  renderId: string;
+  task: GanttTask;
+  id: string;
+  ambiguousIdentity: boolean;
+  settings: TranslationSettings;
+}

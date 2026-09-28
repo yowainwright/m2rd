@@ -71,7 +71,6 @@ const createClassEdges = (
   const occurrences = new Map<string, number>();
   const edges = new Map<string, Edge<ClassEdgeData>>();
   metadata.edges.forEach((edge) => {
-    // Mermaid's edge IDs contain a global counter, not a persistent relation identity.
     const key = classRelationKey(edge);
     const ordinal = occurrences.get(key) || 0;
     occurrences.set(key, ordinal + 1);

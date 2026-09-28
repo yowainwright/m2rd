@@ -30,9 +30,10 @@ const isSensitiveField = (key: string) => {
 };
 
 export const redactString = (value: string) => {
-  return SENSITIVE_STRING_PATTERNS.reduce((redactedValue, item) => {
-    return redactedValue.replace(item.pattern, item.replacement);
-  }, value);
+  return SENSITIVE_STRING_PATTERNS.reduce(
+    (redactedValue, item) => redactedValue.replace(item.pattern, item.replacement),
+    value,
+  );
 };
 
 const redactArray = (value: unknown[], seen: WeakSet<object>) => {

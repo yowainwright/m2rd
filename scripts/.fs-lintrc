@@ -15,8 +15,7 @@
       "app/components/ui/**",
       "app/hooks/use*.ts",
       "!app/hooks/*{-,_}*.ts",
-      "app/export/gifenc.d.ts",
-      "app/lib/cli/bin.ts"
+      "app/export/gifenc.d.ts"
     ]
   }
 }

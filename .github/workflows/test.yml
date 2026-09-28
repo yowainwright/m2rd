@@ -20,13 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
           version: 12.2.1
           cache: true
@@ -48,14 +48,14 @@ jobs:
       FS_LINT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
           version: 12.2.1
           cache: true
@@ -99,13 +99,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
           version: 12.2.1
           cache: true

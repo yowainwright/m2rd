@@ -112,8 +112,8 @@ describe('workspace defaults', () => {
   });
 });
 
-describe('accepting sequence renders', () => {
-  test('keeps fresh message data while restoring edge color, width, and animation', () => {
+const acceptingSequenceRendersCases = {
+  'keeps fresh message data while restoring edge color, width, and animation': () => {
     const edited = applySettings(createElements(), {
       edgeColor: '#123456',
       edgeWidth: 5,
@@ -148,9 +148,8 @@ describe('accepting sequence renders', () => {
       result.translation.elements.nodes.find((node) => node.data.kind === 'sequence-action')?.data
         .label,
     ).toBe('Reply');
-  });
-
-  test('accepts a rendered sequence without applying generic node fills', () => {
+  },
+  'accepts a rendered sequence without applying generic node fills': () => {
     const elements = createElements();
     const result = acceptRenderedElements(APP_INITIAL_CONTEXT, {
       diagramType: 'sequence',
@@ -160,7 +159,11 @@ describe('accepting sequence renders', () => {
     expect(result.translation.elements.nodes).toEqual(elements.nodes);
     expect(result).toMatchObject({ needsRender: false, resetLayout: false });
     expect(result.translation.diagramType).toBe('sequence');
-  });
+  },
+};
+
+describe('accepting sequence renders', () => {
+  Object.entries(acceptingSequenceRendersCases).forEach(([name, run]) => test(name, run));
 });
 
 describe('saved sequence upgrades', () => {
