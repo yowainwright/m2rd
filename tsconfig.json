@@ -23,6 +23,7 @@
     "next-env.d.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
+    "scripts/cli/**/*.ts",
     "tests/**/*.ts",
     "tests/**/*.tsx",
     ".next/types/**/*.ts",
