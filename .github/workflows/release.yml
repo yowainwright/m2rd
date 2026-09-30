@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+    with:
+      ref: ${{ github.ref }}
+
+  release:
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 12.2.1
+          cache: true
+          install: false
+          runtime: node@26
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag matches package version
+        run: test "${TAG#v}" = "$(node -p 'require("./package.json").version')"
+
+      - name: Pack CLI tarball
+        run: pnpm run cli:pack
+
+      - name: Create GitHub release
+        run: gh release create "$TAG" "tmp/m2rd-${TAG#v}.tgz" --title "$TAG" --generate-notes --verify-tag
+
+  tap:
+    needs: release
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: yowainwright/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          ref: main
+          persist-credentials: false
+
+      - name: Update formula
+        run: |
+          VERSION="${TAG#v}"
+          ASSET="m2rd-${VERSION}.tgz"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET"
+          SHA="$(sha256sum "$ASSET" | cut -d' ' -f1)"
+          rm "$ASSET"
+          sed -i -E \
+            -e "s#^  url \".*\"#  url \"https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ASSET}\"#" \
+            -e "s#^  sha256 \".*\"#  sha256 \"${SHA}\"#" \
+            Formula/m2rd.rb
+          jq --arg v "$VERSION" '.version = $v' brews/m2rd.json > brews/m2rd.json.tmp
+          mv brews/m2rd.json.tmp brews/m2rd.json
+
+      - name: Open formula pull request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          add-paths: |
+            Formula/m2rd.rb
+            brews/m2rd.json
+          base: main
+          branch: m2rd
+          commit-message: 'm2rd ${{ github.ref_name }}'
+          title: 'm2rd ${{ github.ref_name }}'
+          body: |
+            Update m2rd.
+
+            Release: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
