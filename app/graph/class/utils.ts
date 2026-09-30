@@ -1,4 +1,4 @@
-import { Schema } from 'effect';
+import { Either, Schema } from 'effect';
 import type { CSSProperties } from 'react';
 import { GraphRenderError } from '../types';
 import { CLASS_COMPATIBILITY_ERROR, ClassMetadataSchema, ClassPointsSchema } from './constants';
@@ -13,6 +13,8 @@ import type {
 
 export const classCompatibilityError = () =>
   new GraphRenderError('unsupported', CLASS_COMPATIBILITY_ERROR, 'classDiagram');
+
+const decodeClassPoints = Schema.decodeUnknownEither(Schema.parseJson(ClassPointsSchema));
 
 export const readClassMetadata = (value: unknown) => {
   const result = Schema.decodeUnknownEither(ClassMetadataSchema)(value);
@@ -181,11 +183,8 @@ export const readClassPoints = (graphics: ClassGraphics, id: string) => {
   const path = requireGraphic(graphics, id);
   const encoded = path.getAttribute('data-points');
   if (!encoded) throw classCompatibilityError();
-  try {
-    const result = Schema.decodeUnknownEither(ClassPointsSchema)(JSON.parse(atob(encoded)));
-    if (result._tag === 'Right') return result.right;
-  } catch {
-    throw classCompatibilityError();
-  }
-  throw classCompatibilityError();
+  return Either.try(() => atob(encoded)).pipe(
+    Either.flatMap(decodeClassPoints),
+    Either.getOrThrowWith(classCompatibilityError),
+  );
 };

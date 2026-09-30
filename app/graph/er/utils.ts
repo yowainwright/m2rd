@@ -1,4 +1,4 @@
-import { Schema } from 'effect';
+import { Either, Schema } from 'effect';
 import type { CSSProperties } from 'react';
 import { GraphRenderError } from '../types';
 import { readClassText } from '../class/utils';
@@ -19,6 +19,8 @@ export const erCompatibilityError = () =>
     'This ER diagram is not supported. Use plain entity labels and attributes without groups or hand-drawn styling.',
     'er',
   );
+
+const decodeErPoints = Schema.decodeUnknownEither(Schema.parseJson(ErPointsSchema));
 
 export const readErMetadata = (value: unknown) => {
   const decoded = Schema.decodeUnknownEither(ErMetadataSchema)(value);
@@ -166,11 +168,8 @@ export const readErPoints = (graphics: ErGraphics, id: string) => {
   const path = requireGraphic(graphics.get(id));
   const encoded = path.getAttribute('data-points');
   if (!encoded) throw erCompatibilityError();
-  try {
-    const decoded = Schema.decodeUnknownEither(ErPointsSchema)(JSON.parse(atob(encoded)));
-    if (decoded._tag === 'Right') return decoded.right;
-  } catch {
-    throw erCompatibilityError();
-  }
-  throw erCompatibilityError();
+  return Either.try(() => atob(encoded)).pipe(
+    Either.flatMap(decodeErPoints),
+    Either.getOrThrowWith(erCompatibilityError),
+  );
 };
