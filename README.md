@@ -105,6 +105,42 @@ m2rd docs/*.md
 
 Files and diagrams appear in order, one diagram at a time. Markdown files without Mermaid blocks are skipped.
 
+#### Read a Mermaid file
+
+```sh
+printf 'flowchart LR\n  A[Start] --> B[Finish]\n' > chart.mmd
+m2rd chart.mmd
+```
+
+#### Export SVG
+
+Save a diagram from a file or stdin:
+
+```sh
+m2rd chart.mmd --output chart.svg
+printf 'sequenceDiagram\n  Alice->>Bob: Hello\n' | m2rd -o sequence.svg
+```
+
+Export requires exactly one diagram and a new `.svg` filename. It runs without an interactive terminal.
+
+#### Adjust terminal output
+
+```sh
+m2rd example.md --width 100 --ascii --no-color
+```
+
+`--width` sets the initial layout width. `--ascii` uses plain drawing characters, and `--no-color` disables color.
+
+#### Preview the styleguide
+
+```sh
+m2rd --styleguide
+m2rd --styleguide --output styleguide.svg
+m2rd --styleguide --ascii --no-color > styleguide.txt
+```
+
+The first command opens the viewer; the others save an SVG theme sample or a text preview.
+
 ---
 
 ## License
