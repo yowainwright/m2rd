@@ -185,6 +185,18 @@
           "reason": "Replace Mermaid/Chevrotain's vulnerable lodash-es pin for GHSA-r5fr-rjxr-66jc and GHSA-f23m-r3pf-42rh. Remove when upstream resolves a patched version without this override.",
           "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc"
         }
+      },
+      "undici@7.29.0@7.29.1": {
+        "dependents": {
+          "m2rd": "undici@7.29.0 (required by @dotenvx/dotenvx, jsdom, release-it)"
+        },
+        "ledger": {
+          "addedDate": "2026-09-30T05:27:17.253Z",
+          "reason": "Replace release-it 21.0.3's vulnerable undici 7.29.0 pin with 7.29.1. Remove when release-it declares a patched version. Scoped to 7.29.0 to preserve other undici versions.",
+          "source": "security",
+          "url": "https://github.com/advisories/GHSA-rfgv-xxqx-mfg5",
+          "patchedVersion": "7.29.1"
+        }
       }
     }
   }
