@@ -1,6 +1,14 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { delimiter, dirname, resolve } from 'node:path';
 import { JSDOM } from 'jsdom';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
@@ -8,6 +16,11 @@ const root = resolve(import.meta.dirname, '../../..');
 const temporary = resolve(root, 'tmp');
 mkdirSync(temporary, { recursive: true });
 const directory = mkdtempSync(resolve(temporary, 'cli-package-test-'));
+const buildDirectories = () => {
+  const entries = readdirSync(temporary);
+  return entries.filter((name) => name.startsWith('cli-package-')).sort();
+};
+const previousDirectories = buildDirectories();
 const installation = resolve(directory, 'install');
 const project = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 const installed = resolve(installation, 'node_modules', project.name);
@@ -111,6 +124,46 @@ test('prints help through the installed npm command', () => {
   expect(result.stdout).toContain('--output');
   expect(result.stdout).toContain('--styleguide');
 });
+
+test('runs the installed m2rd command directly from PATH', () => {
+  const commandPath = [dirname(cli), dirname(process.execPath), process.env.PATH ?? ''].join(
+    delimiter,
+  );
+  const commandEnv = { ...env, PATH: commandPath };
+  const result = spawnSync('m2rd', ['--help'], {
+    cwd: directory,
+    env: commandEnv,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.signal).toBeNull();
+  expectSuccess(result);
+  expect(result.stdout).toContain('Usage: m2rd');
+});
+
+test('removes the build directory while preserving the tarball', () => {
+  expect(buildDirectories()).toEqual(previousDirectories);
+  expect(existsSync(artifact.path)).toBe(true);
+});
+
+test('removes the build directory when npm pack fails', () => {
+  const script = resolve(root, 'scripts/cli/index.ts');
+  const failureEnv = { ...process.env, PATH: directory };
+  const archive = readFileSync(artifact.path);
+  const result = spawnSync(process.execPath, [script], {
+    cwd: root,
+    env: failureEnv,
+    encoding: 'utf8',
+    timeout: 120_000,
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.signal).toBeNull();
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('spawnSync npm ENOENT');
+  expect(buildDirectories()).toEqual(previousDirectories);
+  expect(readFileSync(artifact.path).equals(archive)).toBe(true);
+}, 120_000);
 
 test.each([
   ['flowchart', 'flowchart LR\n A[Start] --> B[Finish]', 'Start'],

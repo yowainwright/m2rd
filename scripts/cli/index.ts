@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -115,11 +116,13 @@ const pack = (directory: string) => {
 };
 
 const packageCli = Effect.gen(function* () {
-  const directory = yield* Effect.sync(prepare);
+  const directory = yield* Effect.acquireRelease(Effect.sync(prepare), (path) =>
+    Effect.sync(() => rmSync(path, { recursive: true, force: true })),
+  );
   const configuration = packageConfig(directory, runtimeAssets, worker);
   yield* Effect.tryPromise(() => build(configuration));
   yield* Effect.sync(() => writeManifest(directory));
   yield* Effect.sync(() => pack(directory));
 });
 
-await Effect.runPromise(packageCli);
+await Effect.runPromise(Effect.scoped(packageCli));
