@@ -295,7 +295,6 @@ const setGlobalMarkers = async (page: Page) => {
 const verifyReloadedEdgeMarkers = async (page: Page, firstEdge: Locator, secondEdge: Locator) => {
   await page.reload();
   await expect(firstEdge).toBeVisible();
-  await firstEdge.click();
   await page.getByRole('button', { name: 'Toolkit: 1 edge', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Marker', exact: true })).toHaveText('None');
   await expect.poll(() => readMarker(firstEdge)).toBeNull();
