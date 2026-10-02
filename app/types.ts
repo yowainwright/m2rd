@@ -20,7 +20,7 @@ export type WorkspaceOperation =
   | { type: 'workspace.delete' };
 export type ExportRequest = { format: 'svg' | 'png' | 'gif'; repeat: GifExportRepeat };
 export type AppContext = {
-  isDesktop: boolean;
+  isDesktop: boolean | null;
   sidebarOpen: boolean;
   versionHistoryOpen: boolean;
   toolkitOpen: boolean;

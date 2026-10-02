@@ -132,10 +132,10 @@ export const RENAME_GRAPH_LABEL = 'Rename graph';
 export const GRAPH_NAME_ERROR_ID = 'graph-name-error';
 
 export const APP_INITIAL_CONTEXT: AppContext = {
-  isDesktop: false,
+  isDesktop: null,
   sidebarOpen: true,
   versionHistoryOpen: true,
-  toolkitOpen: true,
+  toolkitOpen: false,
   canvasRevision: 0,
   needsRender: true,
   resetLayout: false,
