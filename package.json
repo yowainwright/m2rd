@@ -140,7 +140,7 @@
     "oxfmt": "0.71.0",
     "oxlint": "1.86.0",
     "oxlint-plugin-legibility": "^0.0.5",
-    "pastoralist": "^1.13.5",
+    "pastoralist": "^1.13.6",
     "postcss": "^8.5.28",
     "release-it": "21.1.0",
     "rolldown": "^1.2.12",
@@ -188,7 +188,7 @@
       },
       "undici@7.29.0@7.29.1": {
         "dependents": {
-          "m2rd": "undici@7.29.0 (required by @dotenvx/dotenvx, jsdom, release-it)"
+          "m2rd": "undici@7.29.0 (transitive dependency)"
         },
         "ledger": {
           "addedDate": "2026-09-30T05:27:17.253Z",
@@ -196,6 +196,37 @@
           "source": "security",
           "url": "https://github.com/advisories/GHSA-rfgv-xxqx-mfg5",
           "patchedVersion": "7.29.1"
+        }
+      },
+      "basic-ftp@6.2.1": {
+        "dependents": {
+          "m2rd": "basic-ftp (required by get-uri)"
+        },
+        "ledger": {
+          "addedDate": "2026-10-02T07:32:13.763Z",
+          "reason": "Security fix: basic-ftp: Quadratic-time CPU denial of service in Client.list() Unix directory-listing parser (RE_LINE backtracking) (high)",
+          "source": "security",
+          "securityChecked": true,
+          "securityCheckDate": "2026-10-02T07:32:13.766Z",
+          "securityProvider": "osv",
+          "cves": [
+            "CVE-2026-102990"
+          ],
+          "cveDetails": [
+            {
+              "cve": "CVE-2026-102990",
+              "severity": "high",
+              "patchedVersion": "6.2.1"
+            }
+          ],
+          "severity": "high",
+          "url": "https://github.com/patrickjuchli/basic-ftp/security/advisories/GHSA-c475-qrg2-pj4r",
+          "vulnerableRange": ">= 0 < 6.2.1",
+          "patchedVersion": "6.2.1",
+          "sources": [
+            "osv"
+          ],
+          "confidence": "possible"
         }
       }
     }

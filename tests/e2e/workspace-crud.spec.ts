@@ -292,6 +292,22 @@ const setGlobalMarkers = async (page: Page) => {
   return { firstEdge, secondEdge, width };
 };
 
+const verifyReloadedEdgeMarkers = async (page: Page, firstEdge: Locator, secondEdge: Locator) => {
+  await page.reload();
+  await expect(firstEdge).toBeVisible();
+  await page.getByRole('button', { name: 'Toolkit: 1 edge', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Marker', exact: true })).toHaveText('None');
+  await expect.poll(() => readMarker(firstEdge)).toBeNull();
+  await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke', 'rgb(34, 197, 94)');
+  await expect
+    .poll(() => readMarker(secondEdge))
+    .toEqual({ fill: 'none', stroke: 'rgb(239, 68, 68)' });
+  await selectMarker(page, 'Filled arrow');
+  await expect
+    .poll(() => readMarker(firstEdge))
+    .toEqual({ fill: 'rgb(34, 197, 94)', stroke: 'rgb(34, 197, 94)' });
+};
+
 const saveUnnamedGraph = async (page: Page) => {
   let reactFlowWarnings: string[] = [];
 
@@ -866,18 +882,7 @@ test('changes edge markers and matching colors globally and per edge, then resto
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
-  await page.reload();
-  await expect(firstEdge).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Marker', exact: true })).toHaveText('None');
-  await expect.poll(() => readMarker(firstEdge)).toBeNull();
-  await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke', 'rgb(34, 197, 94)');
-  await expect
-    .poll(() => readMarker(secondEdge))
-    .toEqual({ fill: 'none', stroke: 'rgb(239, 68, 68)' });
-  await selectMarker(page, 'Filled arrow');
-  await expect
-    .poll(() => readMarker(firstEdge))
-    .toEqual({ fill: 'rgb(34, 197, 94)', stroke: 'rgb(34, 197, 94)' });
+  await verifyReloadedEdgeMarkers(page, firstEdge, secondEdge);
 });
 
 test('loads legacy marker colors, oversized edges, and untitled names', async ({ page }) => {
@@ -896,6 +901,7 @@ test('loads legacy marker colors, oversized edges, and untitled names', async ({
   await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke-width', '8px');
   const graphName = page.getByRole('button', { name: 'Rename graph', exact: true });
   await expect(graphName).toHaveText(/^[a-f0-9-]{36}$/);
+  await page.getByRole('button', { name: 'Toolkit: Global', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Marker', exact: true })).toHaveText(
     'Filled arrow',
   );
@@ -1116,6 +1122,9 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
   });
 
   await expect(reloadedNode).toHaveCSS('background-color', 'rgb(239, 68, 68)');
+  await reloadedNode.click();
+  await expect(page.getByText('Node selected')).toBeVisible();
+  await page.getByRole('button', { name: 'Toolkit: 1 node', exact: true }).click();
   await expect(page.getByLabel('Fill')).toBeVisible();
   await expect(page.getByLabel('Fill')).toHaveValue('#ef4444');
 

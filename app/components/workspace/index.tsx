@@ -8,6 +8,7 @@ import {
 import { SidebarInset, SidebarProvider } from '@/app/components/ui/sidebar';
 import { useWorkspaceLayout } from '@/app/hooks/useWorkspaceLayout';
 import { AppContext } from '@/app';
+import { cn } from '@/app/lib/utils';
 import { MermaidEditor } from './editor';
 import { WorkspaceHeader } from './header';
 import { GraphPreview } from './render';
@@ -18,9 +19,11 @@ import { WorkspaceErrors } from './utils';
 export function Workspace() {
   const { send } = AppContext.useActorRef();
   const isDesktop = AppContext.useSelector((state) => state.context.isDesktop);
+  const isLayoutReady = isDesktop !== null;
+  const isDesktopLayout = isDesktop === true;
   const sidebarOpen = AppContext.useSelector((state) => state.context.sidebarOpen);
-  const panelOrientation = isDesktop ? 'horizontal' : 'vertical';
-  const panelMinimumSize = isDesktop ? '320px' : '520px';
+  const panelOrientation = isDesktopLayout ? 'horizontal' : 'vertical';
+  const panelMinimumSize = isDesktopLayout ? '320px' : '520px';
   const handleSidebarUpdate = (open: boolean) => send({ type: 'sidebar.update', open });
 
   useWorkspaceLayout();
@@ -32,7 +35,8 @@ export function Workspace() {
         <WorkspaceHeader />
         <WorkspaceErrors />
         <WorkspacePanels
-          isDesktop={isDesktop}
+          isDesktop={isDesktopLayout}
+          isLayoutReady={isLayoutReady}
           panelMinimumSize={panelMinimumSize}
           panelOrientation={panelOrientation}
         />
@@ -41,9 +45,19 @@ export function Workspace() {
   );
 }
 
-function WorkspacePanels({ isDesktop, panelMinimumSize, panelOrientation }: WorkspacePanelsProps) {
+function WorkspacePanels({
+  isDesktop,
+  isLayoutReady,
+  panelMinimumSize,
+  panelOrientation,
+}: WorkspacePanelsProps) {
   return (
-    <section className="h-[70rem] shrink-0 p-4 lg:h-auto lg:min-h-0 lg:flex-1">
+    <section
+      className={cn(
+        'h-[70rem] shrink-0 p-4 lg:h-auto lg:min-h-0 lg:flex-1',
+        !isLayoutReady && 'invisible',
+      )}
+    >
       <ResizablePanelGroup
         className="gap-4"
         disabled={!isDesktop}

@@ -1,5 +1,6 @@
 export type WorkspacePanelsProps = {
   isDesktop: boolean;
+  isLayoutReady: boolean;
   panelMinimumSize: string;
   panelOrientation: 'horizontal' | 'vertical';
 };
