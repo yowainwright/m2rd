@@ -238,6 +238,7 @@ export const APP_MACHINE_CONFIG = {
   context: APP_INITIAL_CONTEXT,
   on: {
     'layout.update': { actions: 'updateLayout' },
+    'layout.panel.update': { actions: 'updatePanelCollapse' },
     'sidebar.update': { actions: 'updateSidebar' },
     'version-history.update': { actions: 'updateVersionHistory' },
     'toolkit.update': { actions: 'updateToolkit' },

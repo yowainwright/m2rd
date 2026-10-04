@@ -75,6 +75,11 @@ const layoutSetup = actorSetup.extend({
       assertEvent(event, 'layout.update');
       return { isDesktop: event.isDesktop };
     }),
+    updatePanelCollapse: assign(({ event }) => {
+      assertEvent(event, 'layout.panel.update');
+      if (event.panel === 'mermaid') return { mermaidPanelCollapsed: event.collapsed };
+      return { reactFlowPanelCollapsed: event.collapsed };
+    }),
     updateSidebar: assign(({ event }) => {
       assertEvent(event, 'sidebar.update');
       return { sidebarOpen: event.open };

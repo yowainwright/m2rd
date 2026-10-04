@@ -1,6 +1,7 @@
 'use client';
 
 import { Effect } from 'effect';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AppContext } from '@/app';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
@@ -12,8 +13,55 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/app/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { getMermaidErrorLine } from '@/app/lib/mermaid';
 import type { ErrorDetailsProps, ErrorSourceLineProps, ErrorSourceProps } from './types';
+
+const PANEL_NAMES = {
+  mermaid: 'Mermaid input',
+  'react-flow': 'React Flow output',
+} as const;
+
+type PanelToggleProps = {
+  isFocused: boolean;
+  panel: 'mermaid' | 'react-flow';
+  onToggle: () => void;
+};
+
+const getPanelToggleIcon = (panel: PanelToggleProps['panel'], isFocused: boolean) => {
+  const isFocusedMermaid = panel === 'mermaid' && isFocused;
+  const isFocusedReactFlow = panel === 'react-flow' && isFocused;
+  if (isFocusedMermaid) return ChevronLeft;
+  if (isFocusedReactFlow) return ChevronRight;
+  if (panel === 'mermaid') return ChevronRight;
+  return ChevronLeft;
+};
+
+export function WorkspacePanelToggle({ isFocused, panel, onToggle }: PanelToggleProps) {
+  const label = isFocused ? 'Restore split view' : `Expand ${PANEL_NAMES[panel]} pane`;
+  const accessibleName = `Toggle focus for ${PANEL_NAMES[panel]} pane`;
+  const Icon = getPanelToggleIcon(panel, isFocused);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={accessibleName}
+          aria-controls="workspace-panels"
+          aria-pressed={isFocused}
+          className="w-8 px-0"
+          size="sm"
+          type="button"
+          variant="outline"
+          onClick={onToggle}
+        >
+          <Icon aria-hidden="true" className="size-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function ErrorIndicator() {
   const { send } = AppContext.useActorRef();

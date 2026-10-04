@@ -222,6 +222,53 @@ const resizePanelsWithPointer = async (
   await expect.poll(async () => (await getBounds(canvas)).width).toBeLessThan(maximumCanvasWidth);
 };
 
+const waitForPanelTransitions = async (page: Page) => {
+  await page.locator('#workspace-panels').evaluate(async (group) => {
+    const elements = [group, ...group.querySelectorAll('[data-panel]')];
+    const transitions = elements.flatMap((element) => element.getAnimations());
+    for (const transition of transitions) {
+      await transition.finished;
+    }
+  });
+};
+
+const togglePanelFocusAndRestore = async (page: Page, panel: 'mermaid' | 'react-flow') => {
+  const isMermaid = panel === 'mermaid';
+  const panelId = isMermaid ? 'mermaid-panel' : 'flow-panel';
+  const siblingId = isMermaid ? 'flow-panel' : 'mermaid-panel';
+  const panelLabel = isMermaid ? 'Mermaid input' : 'React Flow output';
+  const siblingLabel = isMermaid ? 'React Flow output' : 'Mermaid input';
+  const splitChevron = isMermaid ? 'right' : 'left';
+  const focusedChevron = isMermaid ? 'left' : 'right';
+  const selectedPanel = page.locator(`#${panelId}`);
+  const siblingPanel = page.locator(`#${siblingId}`);
+  const toggle = page.getByRole('button', { name: `Toggle focus for ${panelLabel} pane` });
+  await waitForPanelTransitions(page);
+  const selectedBefore = await getBounds(selectedPanel);
+  const siblingBefore = await getBounds(siblingPanel);
+
+  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${splitChevron}`));
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${focusedChevron}`));
+  await expect(page.getByRole('heading', { name: siblingLabel, exact: true })).toBeHidden();
+  await expect(siblingPanel).toHaveCSS('width', '0px');
+  await expect
+    .poll(async () => (await getBounds(selectedPanel)).width)
+    .toBeGreaterThan(selectedBefore.width + 100);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${splitChevron}`));
+  await waitForPanelTransitions(page);
+  await expect
+    .poll(async () => Math.abs((await getBounds(selectedPanel)).width - selectedBefore.width))
+    .toBeLessThan(2);
+  await expect
+    .poll(async () => Math.abs((await getBounds(siblingPanel)).width - siblingBefore.width))
+    .toBeLessThan(2);
+};
+
 const writeLegacyRecords = () =>
   new Promise<void>((resolve, reject) => {
     const request = indexedDB.open('m2rd');
@@ -1067,6 +1114,20 @@ test('resizes the editor and canvas with pointer and keyboard', async ({ page },
 
   await createNewGraph(page);
   await expect(page.locator('#workspace-panels')).toHaveCSS('flex-direction', 'row');
+});
+
+test('focus toggles reverse chevrons and restore the resized panel split', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('./');
+  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
+  await page.keyboard.press('Escape');
+
+  const editor = page.locator('#mermaid-panel');
+  const canvas = page.locator('#flow-panel');
+  const handle = page.getByRole('separator', { name: 'Resize Mermaid and React Flow panels' });
+  await resizePanelsWithPointer(page, editor, canvas, handle);
+  await togglePanelFocusAndRestore(page, 'mermaid');
+  await togglePanelFocusAndRestore(page, 'react-flow');
 });
 
 test('stacks the editor above the canvas on mobile', async ({ page }, testInfo) => {
