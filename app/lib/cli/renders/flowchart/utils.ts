@@ -143,7 +143,7 @@ export const createLayoutInput = (graph: FlowGraph, options: CliOptions): Termin
   );
   const edgesByParent = EffectArray.groupBy(graph.edges, (edge) => edgeContainer(edge, nodes));
   const nest = (node: PanelNode): PanelNode => {
-    const key = `node:${node.id}`;
+    const key: `node:${string}` = `node:${node.id}`;
     const children = (groups[key] ?? []).map(nest);
     const edges = (edgesByParent[key] ?? []).map(layoutEdge);
     return Object.assign({}, node, { children, edges });

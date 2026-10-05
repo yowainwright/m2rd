@@ -7,7 +7,7 @@ export const ER_CARDINALITIES = ['only_one', 'zero_or_one', 'one_or_more', 'zero
 export const ErAttributeSchema = Schema.Struct({
   type: Schema.String,
   name: Schema.String,
-  keys: Schema.Array(Schema.Literal('PK', 'FK', 'UK')),
+  keys: Schema.Array(Schema.Literals(['PK', 'FK', 'UK'])),
   comment: Schema.String,
 });
 export const ErNodeSchema = Schema.Struct({
@@ -16,7 +16,7 @@ export const ErNodeSchema = Schema.Struct({
   alias: Schema.String,
   shape: Schema.Literal('erBox'),
   isGroup: Schema.Literal(false),
-  look: Schema.Literal('classic', 'neo'),
+  look: Schema.Literals(['classic', 'neo']),
   attributes: Schema.Array(ErAttributeSchema),
 });
 export const ErEdgeSchema = Schema.Struct({
@@ -24,15 +24,15 @@ export const ErEdgeSchema = Schema.Struct({
   start: Schema.String,
   end: Schema.String,
   label: Schema.String,
-  arrowTypeStart: Schema.Literal(...ER_CARDINALITIES),
-  arrowTypeEnd: Schema.Literal(...ER_CARDINALITIES),
-  pattern: Schema.Literal('solid', 'dashed'),
+  arrowTypeStart: Schema.Literals(ER_CARDINALITIES),
+  arrowTypeEnd: Schema.Literals(ER_CARDINALITIES),
+  pattern: Schema.Literals(['solid', 'dashed']),
 });
 export const ErMetadataSchema = Schema.Struct({
   nodes: Schema.Array(ErNodeSchema),
   edges: Schema.Array(ErEdgeSchema),
 });
-export const ErPointsSchema = Schema.Array(StatePointSchema).pipe(Schema.minItems(2));
+export const ErPointsSchema = Schema.Array(StatePointSchema).check(Schema.isMinLength(2));
 
 export const ER_MARKERS = {
   only_one: { path: 'M3,0 L3,18 M9,0 L9,18', width: 18, height: 18, circle: false },

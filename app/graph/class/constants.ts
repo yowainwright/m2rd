@@ -19,7 +19,7 @@ export const ClassNodeSchema = Schema.Struct({
   domId: Schema.optional(Schema.String),
   parentId: Schema.optional(Schema.String),
   label: Schema.String,
-  shape: Schema.Literal('classBox', 'rect', 'note'),
+  shape: Schema.Literals(['classBox', 'rect', 'note']),
   isGroup: Schema.Boolean,
   members: Schema.optional(Schema.Array(MemberSchema)),
   methods: Schema.optional(Schema.Array(MemberSchema)),
@@ -30,17 +30,17 @@ export const ClassEdgeSchema = Schema.Struct({
   start: Schema.String,
   end: Schema.String,
   label: Schema.optional(Schema.String),
-  arrowTypeStart: Schema.Literal(...CLASS_MARKERS),
-  arrowTypeEnd: Schema.Literal(...CLASS_MARKERS),
+  arrowTypeStart: Schema.Literals(CLASS_MARKERS),
+  arrowTypeEnd: Schema.Literals(CLASS_MARKERS),
   startLabelRight: Schema.optional(Schema.String),
   endLabelLeft: Schema.optional(Schema.String),
-  pattern: Schema.Literal('solid', 'dashed', 'dotted'),
+  pattern: Schema.Literals(['solid', 'dashed', 'dotted']),
 });
 export const ClassMetadataSchema = Schema.Struct({
   nodes: Schema.Array(ClassNodeSchema),
   edges: Schema.Array(ClassEdgeSchema),
 });
-export const ClassPointsSchema = Schema.Array(StatePointSchema).pipe(Schema.minItems(2));
+export const ClassPointsSchema = Schema.Array(StatePointSchema).check(Schema.isMinLength(2));
 
 export const CLASS_MARKER_PATHS = {
   aggregation: 'M 18,7 L9,13 L1,7 L9,1 Z',

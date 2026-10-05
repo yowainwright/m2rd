@@ -113,11 +113,11 @@ test('reports every failed file when no diagram renders', async () => {
   const unsupported = resolve(directory, 'unsupported.md');
   writeFileSync(malformed, markdown('flowchart TD\n A[unterminated'));
   writeFileSync(unsupported, markdown('classDiagram\n A --> B'));
-  const result = await Effect.runPromise(Effect.either(runCli([malformed, unsupported], options)));
-  expect(result).toMatchObject({ _tag: 'Left', left: expect.stringContaining(malformed) });
-  expect(result).toMatchObject({ left: expect.stringContaining(unsupported) });
-  expect(result).toMatchObject({ left: expect.stringContaining('Parse error') });
-  expect(result).toMatchObject({ left: expect.stringContaining('does not support') });
+  const result = await Effect.runPromise(Effect.result(runCli([malformed, unsupported], options)));
+  expect(result).toMatchObject({ _tag: 'Failure', failure: expect.stringContaining(malformed) });
+  expect(result).toMatchObject({ failure: expect.stringContaining(unsupported) });
+  expect(result).toMatchObject({ failure: expect.stringContaining('Parse error') });
+  expect(result).toMatchObject({ failure: expect.stringContaining('does not support') });
   expect(showViewer).not.toHaveBeenCalled();
 });
 

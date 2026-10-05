@@ -1,4 +1,4 @@
-import { Either, Schema } from 'effect';
+import { Result, Schema } from 'effect';
 import type { CSSProperties } from 'react';
 import { GraphRenderError } from '../types';
 import { CLASS_COMPATIBILITY_ERROR, ClassMetadataSchema, ClassPointsSchema } from './constants';
@@ -14,12 +14,12 @@ import type {
 export const classCompatibilityError = () =>
   new GraphRenderError('unsupported', CLASS_COMPATIBILITY_ERROR, 'classDiagram');
 
-const decodeClassPoints = Schema.decodeUnknownEither(Schema.parseJson(ClassPointsSchema));
+const decodeClassPoints = Schema.decodeUnknownResult(Schema.fromJsonString(ClassPointsSchema));
 
 export const readClassMetadata = (value: unknown) => {
-  const result = Schema.decodeUnknownEither(ClassMetadataSchema)(value);
-  if (result._tag === 'Left') throw classCompatibilityError();
-  const data = result.right;
+  const result = Schema.decodeUnknownResult(ClassMetadataSchema)(value);
+  if (result._tag === 'Failure') throw classCompatibilityError();
+  const data = result.success;
   const nodes = new Map(data.nodes.map((node) => [node.id, node]));
   const missingParent = data.nodes.some(
     (node) => node.parentId && !nodes.get(node.parentId)?.isGroup,
@@ -183,8 +183,8 @@ export const readClassPoints = (graphics: ClassGraphics, id: string) => {
   const path = requireGraphic(graphics, id);
   const encoded = path.getAttribute('data-points');
   if (!encoded) throw classCompatibilityError();
-  return Either.try(() => atob(encoded)).pipe(
-    Either.flatMap(decodeClassPoints),
-    Either.getOrThrowWith(classCompatibilityError),
+  return Result.try(() => atob(encoded)).pipe(
+    Result.flatMap(decodeClassPoints),
+    Result.getOrThrowWith(classCompatibilityError),
   );
 };

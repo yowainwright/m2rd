@@ -4,7 +4,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { createElement } from 'react';
 import { Text, renderToString } from 'ink';
 import { Effect } from 'effect';
-import type { Either } from 'effect';
+import type { Result } from 'effect';
 import { Lexer } from 'marked';
 import type { Token, Tokens } from 'marked';
 import { Panel } from '@/app/components/ui/panel';
@@ -232,22 +232,22 @@ export const renderDiagram = (source: string, options: CliOptions) =>
 const renderDocumentDiagram = ({ source, label }: CliDiagram, options: CliOptions) =>
   renderDiagram(source, options).pipe(
     Effect.mapError((error) => `${label}: ${error}`),
-    Effect.either,
+    Effect.result,
     Effect.map((result) => ({ result, label })),
   );
 
 const presentRenderedDiagrams = (
-  rendered: { result: Either.Either<string, string>; label: string }[],
+  rendered: { result: Result.Result<string, string>; label: string }[],
   ascii: boolean,
 ) => {
   const failures = rendered.flatMap(({ result }) => {
-    if (result._tag === 'Left') return [result.left];
+    if (result._tag === 'Failure') return [result.failure];
     return [];
   });
   if (failures.length === rendered.length) return Effect.fail(failures.join('\n'));
   const views = rendered.map(({ result, label }) => {
     const diagram =
-      result._tag === 'Right' ? result.right : `Unable to render diagram:\n${result.left}`;
+      result._tag === 'Success' ? result.success : `Unable to render diagram:\n${result.failure}`;
     return { diagram, label };
   });
   return showViewer(views, ascii);

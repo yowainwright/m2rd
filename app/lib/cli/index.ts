@@ -47,9 +47,9 @@ const main = async () => {
   const { runCli, formatError } = await import('./utils');
   const { runStyleguide } = await import('./styleguide');
   const operation = options.styleguide ? runStyleguide(options) : runCli(options.paths, options);
-  const result = await Effect.runPromise(Effect.either(operation));
-  if (result._tag === 'Left') {
-    process.stderr.write(`${formatError(result.left)}\n`);
+  const result = await Effect.runPromise(Effect.result(operation));
+  if (result._tag === 'Failure') {
+    process.stderr.write(`${formatError(result.failure)}\n`);
     process.exitCode = 1;
     return;
   }
