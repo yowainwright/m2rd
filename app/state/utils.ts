@@ -1,4 +1,5 @@
 import { and, assign, assertEvent, enqueueActions, fromPromise, not, setup, stateIn } from 'xstate';
+import type { Viewport } from 'reactflow';
 import { APP_INITIAL_CONTEXT, SAVE_FEEDBACK_MS } from '@/app/constants';
 import { EMPTY_GRAPH_NAME_ERROR, LEGACY_UNTITLED_GRAPH_NAME } from '@/app/graph/constants';
 import type { AppContext as AppMachineContext, AppEvent, LoadedWorkspace } from '@/app/types';
@@ -31,6 +32,16 @@ import {
 export const getActorInput = ({ context }: { context: AppMachineContext }) => context;
 export const getActorOutput = <Value>({ event }: { event: { output: Value } }) => event.output;
 export const getActorError = ({ event }: { event: { error: unknown } }) => event.error;
+
+const MAX_VIEWPORT_HISTORY = 5;
+const isSameViewport = (current: Viewport | undefined, next: Viewport) => {
+  if (!current) return false;
+  const sameX = current.x === next.x;
+  const sameY = current.y === next.y;
+  const sameZoom = current.zoom === next.zoom;
+  const samePosition = sameX && sameY;
+  return samePosition && sameZoom;
+};
 
 const actorSetup = setup({
   types: {} as { context: AppMachineContext; events: AppEvent },
@@ -108,14 +119,22 @@ const documentSetup = layoutSetup.extend({
     canNavigate: and(['isNotExporting', 'isNotRenaming']),
     canDelete: and(['isSavedWorkspace', 'isNotExporting', 'isNotRenaming']),
     canSave: and(['hasValidGraph', 'isNotRenaming']),
+    canGoBackViewport: ({ context }) => context.viewportHistory.length > 0,
+    canGoForwardViewport: ({ context }) => context.viewportForwardHistory.length > 0,
   },
   actions: {
     restoreInitialWorkspace: assign(({ context }, { records, workspaces }: LoadedWorkspace) => {
-      if (!records) return { workspaces };
-      return Object.assign({}, restoreWorkspace(context, records), { workspaces });
+      if (!records) return { workspaces, viewportHistory: [], viewportForwardHistory: [] };
+      return Object.assign({}, restoreWorkspace(context, records), {
+        workspaces,
+        viewportHistory: [],
+        viewportForwardHistory: [],
+      });
     }),
     acceptInitialWorkspaces: assign((_, output: LoadedWorkspace) => ({
       workspaces: output.workspaces,
+      viewportHistory: [],
+      viewportForwardHistory: [],
     })),
     acceptRenderedElements: assign(({ context }, output: GraphRenderResult) =>
       acceptRenderedElements(context, output),
@@ -124,11 +143,18 @@ const documentSetup = layoutSetup.extend({
       acceptSavedWorkspace(context, output.records),
     ),
     restoreWorkspace: assign(({ context }, records: GraphRecords) =>
-      restoreWorkspace(context, records),
+      Object.assign({}, restoreWorkspace(context, records), {
+        viewportHistory: [],
+        viewportForwardHistory: [],
+      }),
     ),
     acceptDeletedWorkspace: assign(({ context }) => {
       const workspaces = context.workspaces.filter((item) => item.id !== context.workspace.id);
-      return Object.assign({}, resetWorkspace(context), { workspaces });
+      return Object.assign({}, resetWorkspace(context), {
+        workspaces,
+        viewportHistory: [],
+        viewportForwardHistory: [],
+      });
     }),
     reportOperationError: assign((_, error: unknown) => ({
       operationError: toErrorMessage(error),
@@ -172,19 +198,67 @@ const documentSetup = layoutSetup.extend({
     }),
     updateViewport: assign(({ context, event }) => {
       assertEvent(event, 'viewport.update');
+      const currentViewport = context.translation.view.viewport;
+      if (isSameViewport(currentViewport, event.viewport)) return {};
+      const viewportHistory = currentViewport
+        ? context.viewportHistory.concat(currentViewport).slice(-MAX_VIEWPORT_HISTORY)
+        : context.viewportHistory;
       const view = Object.assign({}, context.translation.view, { viewport: event.viewport });
-      return updateTranslation(context, { view });
+      return Object.assign({}, updateTranslation(context, { view }), {
+        viewportHistory,
+        viewportForwardHistory: [],
+      });
+    }),
+    goBackViewport: assign(({ context, event }) => {
+      assertEvent(event, 'viewport.back');
+      const viewport = context.viewportHistory.at(-1);
+      const currentViewport = context.translation.view.viewport;
+      if (!viewport) return {};
+      if (!currentViewport) return {};
+      const viewportHistory = context.viewportHistory.slice(0, -1);
+      const viewportForwardHistory = context.viewportForwardHistory
+        .concat(currentViewport)
+        .slice(-MAX_VIEWPORT_HISTORY);
+      const view = Object.assign({}, context.translation.view, { viewport });
+      return Object.assign({}, updateTranslation(context, { view }), {
+        viewportHistory,
+        viewportForwardHistory,
+      });
+    }),
+    goForwardViewport: assign(({ context, event }) => {
+      assertEvent(event, 'viewport.forward');
+      const viewport = context.viewportForwardHistory.at(-1);
+      const currentViewport = context.translation.view.viewport;
+      if (!viewport) return {};
+      if (!currentViewport) return {};
+      const viewportHistory = context.viewportHistory
+        .concat(currentViewport)
+        .slice(-MAX_VIEWPORT_HISTORY);
+      const viewportForwardHistory = context.viewportForwardHistory.slice(0, -1);
+      const view = Object.assign({}, context.translation.view, { viewport });
+      return Object.assign({}, updateTranslation(context, { view }), {
+        viewportHistory,
+        viewportForwardHistory,
+      });
     }),
     resetWorkspace: assign(({ context, event }) => {
       assertEvent(event, 'workspace.create');
-      return resetWorkspace(context, event.sample);
+      return Object.assign({}, resetWorkspace(context, event.sample), {
+        viewportHistory: [],
+        viewportForwardHistory: [],
+      });
     }),
     clearOperationError: assign({ operationError: null }),
     requestWorkspace: assign(({ event }) => {
       assertEvent(event, 'workspace.load');
       return { loadRequest: event.request };
     }),
-    requestLayoutReset: assign({ resetLayout: true, needsRender: true }),
+    requestLayoutReset: assign({
+      resetLayout: true,
+      needsRender: true,
+      viewportHistory: [],
+      viewportForwardHistory: [],
+    }),
   },
 });
 

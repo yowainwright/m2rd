@@ -15,7 +15,7 @@ export {
 
 export const TOOLKIT_LABELS = {
   title: 'Graph toolkit',
-  trigger: 'Toolkit',
+  trigger: 'adj diagram',
   nodes: 'Nodes',
   fill: 'Fill',
   gradientColorA: 'Color A',

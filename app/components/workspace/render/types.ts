@@ -20,7 +20,6 @@ export type GraphCanvasProps = {
   backgroundGrid: ReactNode;
   canEditCanvas: boolean;
   canvasDeleteKey: 'Backspace' | null;
-  canvasRevision: number;
   edges: Edge[];
   nodes: Node[];
   onEdgesChange: (changes: EdgeChange[]) => void;

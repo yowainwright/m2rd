@@ -1,11 +1,14 @@
 'use client';
 
+import { Crosshair, Redo2, RotateCcw, Undo2 } from 'lucide-react';
+import { ReactFlowProvider, useReactFlow } from 'reactflow';
 import { getWorkspaceLabel } from '@/app/graph';
 import { Button } from '@/app/components/ui/button';
 import { CanvasTools, EdgeTools, NodeTools } from '@/app/components/toolkit';
 import { DEFAULT_CANVAS_SETTINGS } from '@/app/components/toolkit/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { AppContext } from '@/app';
 import {
   createRenderActions,
@@ -78,21 +81,135 @@ function PreviewToolkit(props: PreviewProps) {
   );
 }
 
+function BackViewportButton({ actions }: Pick<PreviewProps, 'actions'>) {
+  const canGoBack = AppContext.useSelector((state) => state.can({ type: 'viewport.back' }));
+  const previousViewport = AppContext.useSelector((state) => state.context.viewportHistory.at(-1));
+  const { setViewport } = useReactFlow();
+  const handleBack = () => {
+    if (!previousViewport) return;
+    actions.handleViewportBack();
+    void setViewport(previousViewport);
+  };
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex shrink-0">
+          <Button
+            aria-label={RENDER_LABELS.back}
+            className="h-8 w-8"
+            disabled={!canGoBack}
+            onClick={handleBack}
+            size="icon"
+            type="button"
+            variant="outline"
+          >
+            <Undo2 aria-hidden="true" className="size-4" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{RENDER_LABELS.back}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function ForwardViewportButton({ actions }: Pick<PreviewProps, 'actions'>) {
+  const canGoForward = AppContext.useSelector((state) => state.can({ type: 'viewport.forward' }));
+  const nextViewport = AppContext.useSelector((state) =>
+    state.context.viewportForwardHistory.at(-1),
+  );
+  const { setViewport } = useReactFlow();
+  const handleForward = () => {
+    if (!nextViewport) return;
+    actions.handleViewportForward();
+    void setViewport(nextViewport);
+  };
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex shrink-0">
+          <Button
+            aria-label={RENDER_LABELS.forward}
+            className="h-8 w-8"
+            disabled={!canGoForward}
+            onClick={handleForward}
+            size="icon"
+            type="button"
+            variant="outline"
+          >
+            <Redo2 aria-hidden="true" className="size-4" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{RENDER_LABELS.forward}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function ViewportButtons({ actions }: Pick<PreviewProps, 'actions'>) {
+  const hasNavigationHistory = AppContext.useSelector(({ context }) => {
+    const hasBackHistory = context.viewportHistory.length > 0;
+    const hasForwardHistory = context.viewportForwardHistory.length > 0;
+    return hasBackHistory || hasForwardHistory;
+  });
+  if (!hasNavigationHistory) return null;
+  return (
+    <>
+      <BackViewportButton actions={actions} />
+      <ForwardViewportButton actions={actions} />
+    </>
+  );
+}
+
+function RecenterButton() {
+  const { fitView } = useReactFlow();
+  const handleRecenter = () => void fitView();
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex shrink-0">
+          <Button
+            aria-label={RENDER_LABELS.recenter}
+            className="h-8 w-8"
+            onClick={handleRecenter}
+            size="icon"
+            type="button"
+            variant="outline"
+          >
+            <Crosshair aria-hidden="true" className="size-4" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{RENDER_LABELS.recenter}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function PreviewHeader(props: PreviewProps) {
   const canReset = AppContext.useSelector((state) => state.can({ type: 'layout.reset' }));
   return (
     <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
       <CardTitle className="text-sm">{RENDER_LABELS.output}</CardTitle>
       <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          type="button"
-          variant="outline"
-          onClick={props.actions.handleLayout}
-          disabled={!canReset}
-        >
-          {RENDER_LABELS.resetLayout}
-        </Button>
+        <ViewportButtons actions={props.actions} />
+        <RecenterButton />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex shrink-0">
+              <Button
+                aria-label={RENDER_LABELS.resetLayout}
+                className="h-8 w-8"
+                disabled={!canReset}
+                onClick={props.actions.handleLayout}
+                size="icon"
+                type="button"
+                variant="outline"
+              >
+                <RotateCcw aria-hidden="true" className="size-4" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{RENDER_LABELS.resetLayout}</TooltipContent>
+        </Tooltip>
         <PreviewToolkit {...props} />
       </div>
     </CardHeader>
@@ -100,7 +217,6 @@ function PreviewHeader(props: PreviewProps) {
 }
 
 function PreviewCanvas({ actions, canvas, selection, translation }: PreviewProps) {
-  const canvasRevision = AppContext.useSelector((state) => state.context.canvasRevision);
   const canEditDraft = AppContext.useSelector((state) => state.matches({ document: 'active' }));
   const isRendering = AppContext.useSelector((state) => state.hasTag('rendering'));
   const canEditCanvas = canEditDraft && !isRendering && !canvas.locked;
@@ -114,7 +230,6 @@ function PreviewCanvas({ actions, canvas, selection, translation }: PreviewProps
       backgroundGrid={backgroundGrid}
       canEditCanvas={canEditCanvas}
       canvasDeleteKey={canvasDeleteKey}
-      canvasRevision={canvasRevision}
       edges={translation.elements.edges}
       nodes={translation.elements.nodes}
       onEdgesChange={actions.handleEdges}
@@ -129,7 +244,7 @@ function PreviewCanvas({ actions, canvas, selection, translation }: PreviewProps
   );
 }
 
-export function GraphPreview() {
+function GraphPreviewContent() {
   const { send } = AppContext.useActorRef();
   const translation = AppContext.useSelector((state) => state.context.translation);
   const canvas = Object.assign({}, DEFAULT_CANVAS_SETTINGS, translation.view.canvas);
@@ -143,5 +258,14 @@ export function GraphPreview() {
         <PreviewCanvas {...props} />
       </CardContent>
     </Card>
+  );
+}
+
+export function GraphPreview() {
+  const canvasRevision = AppContext.useSelector((state) => state.context.canvasRevision);
+  return (
+    <ReactFlowProvider key={canvasRevision}>
+      <GraphPreviewContent />
+    </ReactFlowProvider>
   );
 }

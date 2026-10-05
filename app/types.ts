@@ -34,6 +34,8 @@ export type AppContext = {
   afterRename: WorkspaceOperation | null;
   exportError: string | null;
   loadRequest: WorkspaceRequest | null;
+  viewportHistory: Viewport[];
+  viewportForwardHistory: Viewport[];
   exportRequest: ExportRequest;
   input: GraphInput;
   translation: GraphTranslation;
@@ -59,6 +61,8 @@ export type AppEvent =
   | { type: 'edges.style'; settings: Partial<TranslationSettings> }
   | { type: 'canvas.update'; settings: Partial<GraphCanvasSettings> }
   | { type: 'viewport.update'; viewport: Viewport }
+  | { type: 'viewport.back' }
+  | { type: 'viewport.forward' }
   | { type: 'layout.reset' }
   | { type: 'error.dismiss' }
   | { type: 'error.view' }

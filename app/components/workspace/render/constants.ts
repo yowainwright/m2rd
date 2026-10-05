@@ -24,6 +24,9 @@ import {
 
 export const RENDER_LABELS = {
   output: 'React Flow output',
+  back: 'Prev',
+  forward: 'Redo',
+  recenter: 'Re-center',
   resetLayout: 'Reset layout',
   nodeSelected: 'Node selected',
   edgeSelected: 'Edge selected',

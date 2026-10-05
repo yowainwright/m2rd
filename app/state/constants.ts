@@ -85,6 +85,8 @@ const ACTIVE_DOCUMENT = appSetup.createStateConfig({
     'edges.style': { actions: 'updateStyles' },
     'canvas.update': { actions: 'updateCanvas' },
     'viewport.update': { actions: 'updateViewport' },
+    'viewport.back': { guard: 'canGoBackViewport', actions: 'goBackViewport' },
+    'viewport.forward': { guard: 'canGoForwardViewport', actions: 'goForwardViewport' },
     'input.update': {
       target: '.rendering',
       reenter: true,

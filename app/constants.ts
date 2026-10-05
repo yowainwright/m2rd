@@ -137,6 +137,8 @@ export const APP_INITIAL_CONTEXT: AppContext = {
   versionHistoryOpen: true,
   toolkitOpen: false,
   canvasRevision: 0,
+  viewportHistory: [],
+  viewportForwardHistory: [],
   needsRender: true,
   resetLayout: false,
   errorDialogDismissed: false,
