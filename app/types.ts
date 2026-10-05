@@ -21,6 +21,8 @@ export type WorkspaceOperation =
 export type ExportRequest = { format: 'svg' | 'png' | 'gif'; repeat: GifExportRepeat };
 export type AppContext = {
   isDesktop: boolean | null;
+  mermaidPanelCollapsed: boolean;
+  reactFlowPanelCollapsed: boolean;
   sidebarOpen: boolean;
   versionHistoryOpen: boolean;
   toolkitOpen: boolean;
@@ -47,6 +49,7 @@ export type AppContext = {
 export type AppEvent =
   | WorkspaceOperation
   | { type: 'layout.update'; isDesktop: boolean }
+  | { type: 'layout.panel.update'; panel: 'mermaid' | 'react-flow'; collapsed: boolean }
   | { type: 'sidebar.update'; open: boolean }
   | { type: 'version-history.update'; open: boolean }
   | { type: 'toolkit.update'; open: boolean }

@@ -7,6 +7,7 @@ import { Button } from '@/app/components/ui/button';
 import { CanvasTools, EdgeTools, NodeTools } from '@/app/components/toolkit';
 import { DEFAULT_CANVAS_SETTINGS } from '@/app/components/toolkit/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
+import { cn } from '@/app/lib/utils';
 import { Separator } from '@/app/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { AppContext } from '@/app';
@@ -21,6 +22,7 @@ import {
 } from './utils';
 import { RENDER_LABELS } from './constants';
 import type { PreviewProps } from './types';
+import { WorkspacePanelToggle } from '../utils';
 
 function useToolkitMetadata({ selection, translation }: PreviewProps) {
   const versions = AppContext.useSelector((state) => state.context.versions);
@@ -184,34 +186,57 @@ function RecenterButton() {
   );
 }
 
-function PreviewHeader(props: PreviewProps) {
+type PreviewHeaderProps = {
+  props: PreviewProps;
+  isFocused: boolean;
+  onToggleCollapse: () => void;
+};
+
+function PreviewHeaderActions({
+  props,
+  canReset,
+  isFocused,
+  onToggleCollapse,
+}: PreviewHeaderProps & { canReset: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <ViewportButtons actions={props.actions} />
+      <RecenterButton />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex shrink-0">
+            <Button
+              aria-label={RENDER_LABELS.resetLayout}
+              className="h-8 w-8"
+              disabled={!canReset}
+              onClick={props.actions.handleLayout}
+              size="icon"
+              type="button"
+              variant="outline"
+            >
+              <RotateCcw aria-hidden="true" className="size-4" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{RENDER_LABELS.resetLayout}</TooltipContent>
+      </Tooltip>
+      <PreviewToolkit {...props} />
+      <WorkspacePanelToggle isFocused={isFocused} panel="react-flow" onToggle={onToggleCollapse} />
+    </div>
+  );
+}
+
+function PreviewHeader({ props, isFocused, onToggleCollapse }: PreviewHeaderProps) {
   const canReset = AppContext.useSelector((state) => state.can({ type: 'layout.reset' }));
   return (
     <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
       <CardTitle className="text-sm">{RENDER_LABELS.output}</CardTitle>
-      <div className="flex items-center gap-2">
-        <ViewportButtons actions={props.actions} />
-        <RecenterButton />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex shrink-0">
-              <Button
-                aria-label={RENDER_LABELS.resetLayout}
-                className="h-8 w-8"
-                disabled={!canReset}
-                onClick={props.actions.handleLayout}
-                size="icon"
-                type="button"
-                variant="outline"
-              >
-                <RotateCcw aria-hidden="true" className="size-4" />
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{RENDER_LABELS.resetLayout}</TooltipContent>
-        </Tooltip>
-        <PreviewToolkit {...props} />
-      </div>
+      <PreviewHeaderActions
+        canReset={canReset}
+        isFocused={isFocused}
+        onToggleCollapse={onToggleCollapse}
+        props={props}
+      />
     </CardHeader>
   );
 }
@@ -244,7 +269,13 @@ function PreviewCanvas({ actions, canvas, selection, translation }: PreviewProps
   );
 }
 
-function GraphPreviewContent() {
+type GraphPreviewProps = {
+  isCollapsed: boolean;
+  isFocused: boolean;
+  onToggleCollapse: () => void;
+};
+
+function GraphPreviewContent({ isCollapsed, isFocused, onToggleCollapse }: GraphPreviewProps) {
   const { send } = AppContext.useActorRef();
   const translation = AppContext.useSelector((state) => state.context.translation);
   const canvas = Object.assign({}, DEFAULT_CANVAS_SETTINGS, translation.view.canvas);
@@ -252,8 +283,8 @@ function GraphPreviewContent() {
   const actions = createRenderActions(send);
   const props = { actions, canvas, selection, translation };
   return (
-    <Card className="flex h-full min-h-0 flex-col overflow-hidden">
-      <PreviewHeader {...props} />
+    <Card className={cn('flex h-full min-h-0 flex-col overflow-hidden', isCollapsed && 'hidden')}>
+      <PreviewHeader isFocused={isFocused} onToggleCollapse={onToggleCollapse} props={props} />
       <CardContent className="min-h-0 flex-1 p-0">
         <PreviewCanvas {...props} />
       </CardContent>
@@ -261,11 +292,11 @@ function GraphPreviewContent() {
   );
 }
 
-export function GraphPreview() {
+export function GraphPreview(props: GraphPreviewProps) {
   const canvasRevision = AppContext.useSelector((state) => state.context.canvasRevision);
   return (
     <ReactFlowProvider key={canvasRevision}>
-      <GraphPreviewContent />
+      <GraphPreviewContent {...props} />
     </ReactFlowProvider>
   );
 }
