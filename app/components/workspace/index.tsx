@@ -140,12 +140,7 @@ function WorkspacePanelGroup(props: WorkspacePanelGroupProps) {
 function WorkspacePanelLayout(props: WorkspacePanelLayoutProps) {
   return (
     <ResizablePanelGroup
-      className={cn(
-        'gap-4 transition-[gap] duration-200 ease-in-out motion-reduce:transition-none',
-        '[&>[data-panel]]:transition-[flex-grow] [&>[data-panel]]:duration-200 [&>[data-panel]]:ease-in-out',
-        'motion-reduce:[&>[data-panel]]:transition-none',
-        props.isFocusMode && 'gap-0',
-      )}
+      className={cn('gap-4', props.isFocusMode && 'gap-0')}
       disabled={!props.isDesktop}
       id="workspace-panels"
       orientation={props.panelOrientation}

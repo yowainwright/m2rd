@@ -6,6 +6,12 @@ overrides:
   'source-map-js': '1.2.2'
   'katex': '0.19.0'
 
+audit:
+  ignore:
+    # Temporary exception: braces through the shadcn dev CLI; no patched release as of 2026-10-05.
+    # Remove when upstream ships a fix: https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+    - GHSA-vfj7-8cjw-p6xm
+
 minimumReleaseAgeExclude:
   - '@oxlint/binding-android-arm-eabi@1.83.0 || 1.87.0'
   - '@oxlint/binding-android-arm64@1.83.0 || 1.87.0'
