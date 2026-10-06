@@ -228,6 +228,99 @@
           ],
           "confidence": "possible"
         }
+      },
+      "proxy-addr@2.0.8": {
+        "dependents": {
+          "m2rd": "proxy-addr (required by shadcn)"
+        },
+        "ledger": {
+          "addedDate": "2026-10-06T01:02:24.934Z",
+          "reason": "Security fix: proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet (critical)",
+          "source": "security",
+          "securityChecked": true,
+          "securityCheckDate": "2026-10-06T01:02:24.963Z",
+          "securityProvider": "osv",
+          "cves": [
+            "CVE-2026-90711"
+          ],
+          "cveDetails": [
+            {
+              "cve": "CVE-2026-90711",
+              "severity": "critical",
+              "patchedVersion": "2.0.8"
+            }
+          ],
+          "severity": "critical",
+          "url": "https://github.com/jshttp/proxy-addr/security/advisories/GHSA-jqcg-44mw-7w3h",
+          "vulnerableRange": ">= 1.1.0 < 2.0.8",
+          "patchedVersion": "2.0.8",
+          "sources": [
+            "osv"
+          ],
+          "confidence": "possible"
+        }
+      },
+      "source-map-js@1.2.2": {
+        "dependents": {
+          "m2rd": "source-map-js (required by @tailwindcss/postcss, @testing-library/jest-dom, autoprefixer)"
+        },
+        "ledger": {
+          "addedDate": "2026-10-06T01:02:24.934Z",
+          "reason": "Security fix: source-map-js allows event-loop denial of service through indexed source-map section offsets (high)",
+          "source": "security",
+          "securityChecked": true,
+          "securityCheckDate": "2026-10-06T01:02:24.963Z",
+          "securityProvider": "osv",
+          "cves": [
+            "CVE-2026-93749"
+          ],
+          "cveDetails": [
+            {
+              "cve": "CVE-2026-93749",
+              "severity": "high",
+              "patchedVersion": "1.2.2"
+            }
+          ],
+          "severity": "high",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-93749",
+          "vulnerableRange": ">= 1.0.0 < 1.2.2",
+          "patchedVersion": "1.2.2",
+          "sources": [
+            "osv"
+          ],
+          "confidence": "possible"
+        }
+      },
+      "katex@0.19.0": {
+        "dependents": {
+          "m2rd": "katex (required by mermaid)"
+        },
+        "ledger": {
+          "addedDate": "2026-10-06T01:02:24.934Z",
+          "reason": "Security fix: KaTeX: Existing prototype pollution can bypass trust restrictions (low)",
+          "source": "security",
+          "securityChecked": true,
+          "securityCheckDate": "2026-10-06T01:02:24.963Z",
+          "securityProvider": "osv",
+          "cves": [
+            "CVE-2026-103923"
+          ],
+          "cveDetails": [
+            {
+              "cve": "CVE-2026-103923",
+              "severity": "low",
+              "patchedVersion": "0.18.2"
+            }
+          ],
+          "severity": "low",
+          "url": "https://github.com/KaTeX/KaTeX/security/advisories/GHSA-238p-pmpm-9mq7",
+          "vulnerableRange": ">= 0.11.0 < 0.18.2",
+          "patchedVersion": "0.18.2",
+          "sources": [
+            "osv"
+          ],
+          "confidence": "possible"
+        }
       }
     }
   },
