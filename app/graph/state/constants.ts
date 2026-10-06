@@ -19,19 +19,19 @@ export const STATE_SHAPES = [
   'noteGroup',
 ] as const;
 export const StatePointSchema = Schema.Struct({
-  x: Schema.Number.pipe(Schema.finite()),
-  y: Schema.Number.pipe(Schema.finite()),
+  x: Schema.Number.check(Schema.isFinite()),
+  y: Schema.Number.check(Schema.isFinite()),
 });
 export const StateNodeSchema = Schema.Struct({
   id: Schema.String,
   domId: Schema.String,
-  shape: Schema.Literal(...STATE_SHAPES),
-  label: Schema.optional(Schema.Union(Schema.String, Schema.Array(Schema.String))),
+  shape: Schema.Literals(STATE_SHAPES),
+  label: Schema.optional(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
   parentId: Schema.optional(Schema.String),
-  x: Schema.Number.pipe(Schema.finite()),
-  y: Schema.Number.pipe(Schema.finite()),
-  width: Schema.Number.pipe(Schema.positive(), Schema.finite()),
-  height: Schema.Number.pipe(Schema.positive(), Schema.finite()),
+  x: Schema.Number.check(Schema.isFinite()),
+  y: Schema.Number.check(Schema.isFinite()),
+  width: Schema.Number.check(Schema.isGreaterThan(0), Schema.isFinite()),
+  height: Schema.Number.check(Schema.isGreaterThan(0), Schema.isFinite()),
 });
 export const StateEdgeSchema = Schema.Struct({
   id: Schema.String,
@@ -40,7 +40,7 @@ export const StateEdgeSchema = Schema.Struct({
   label: Schema.optional(Schema.String),
   arrowTypeEnd: Schema.String,
   pattern: Schema.optional(Schema.String),
-  points: Schema.Array(StatePointSchema).pipe(Schema.minItems(2)),
+  points: Schema.Array(StatePointSchema).check(Schema.isMinLength(2)),
 });
 export const StateLayoutSchema = Schema.Struct({
   nodes: Schema.Array(StateNodeSchema),

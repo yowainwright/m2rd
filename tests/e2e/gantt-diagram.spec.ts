@@ -18,7 +18,7 @@ const chooseGantt = async (page: Page) => {
 
 const selectFill = async (page: Page, label: string) => {
   await page.locator(`[data-gantt-task="${label}"]`).click();
-  await page.getByRole('button', { name: 'Toolkit: 1 node', exact: true }).click();
+  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
   await expect(page.getByLabel('Shape', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Marker', { exact: true })).toHaveCount(0);
   await page.getByLabel('Fill', { exact: true }).fill('#ef4444');

@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { Box, Text, renderToString } from 'ink';
-import { Array as EffectArray, Effect } from 'effect';
+import { Array as EffectArray, Effect, Result } from 'effect';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type { ElkPoint, ElkEdgeSection, ElkNode, ElkExtendedEdge } from 'elkjs';
 import { UnicodeContext } from '@/app/hooks/useUnicode';
@@ -177,7 +177,7 @@ const drawFlowchart = (layout: TerminalLayout, graph: FlowGraph, options: CliOpt
   const width = Math.ceil(layout.width);
   const height = Math.ceil(layout.height);
   const [nodeLayouts, frameLayouts] = EffectArray.partition(layout.children, (node) =>
-    Boolean(node.frame),
+    node.frame ? Result.fail(node) : Result.succeed(node),
   );
   const frames = frameLayouts.map((node) => positionedPanel(node, options.ascii));
   const nodes = nodeLayouts.map((node) => positionedPanel(node, options.ascii));

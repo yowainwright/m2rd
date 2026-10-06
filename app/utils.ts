@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Effect, Semaphore } from 'effect';
 import mermaid from 'mermaid';
 import { renderStateDiagram } from '@/app/graph/state';
 import { renderClassDiagram } from '@/app/graph/class';
@@ -51,7 +51,7 @@ mermaid.initialize({
   themeVariables: { rectBkgColor: 'transparent' },
 });
 const browserLogger = createBrowserLogger();
-const renderSemaphore = Effect.unsafeMakeSemaphore(1);
+const renderSemaphore = Semaphore.makeUnsafe(1);
 
 export const toErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;

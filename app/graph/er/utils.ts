@@ -1,4 +1,4 @@
-import { Either, Schema } from 'effect';
+import { Result, Schema } from 'effect';
 import type { CSSProperties } from 'react';
 import { GraphRenderError } from '../types';
 import { readClassText } from '../class/utils';
@@ -20,12 +20,12 @@ export const erCompatibilityError = () =>
     'er',
   );
 
-const decodeErPoints = Schema.decodeUnknownEither(Schema.parseJson(ErPointsSchema));
+const decodeErPoints = Schema.decodeUnknownResult(Schema.fromJsonString(ErPointsSchema));
 
 export const readErMetadata = (value: unknown) => {
-  const decoded = Schema.decodeUnknownEither(ErMetadataSchema)(value);
-  if (decoded._tag === 'Left') throw erCompatibilityError();
-  const metadata = decoded.right;
+  const decoded = Schema.decodeUnknownResult(ErMetadataSchema)(value);
+  if (decoded._tag === 'Failure') throw erCompatibilityError();
+  const metadata = decoded.success;
   const ids = new Set(metadata.nodes.map((node) => node.id));
   const names = new Set(metadata.nodes.map((node) => node.label));
   const edgeIds = new Set(metadata.edges.map((edge) => edge.id));
@@ -168,8 +168,8 @@ export const readErPoints = (graphics: ErGraphics, id: string) => {
   const path = requireGraphic(graphics.get(id));
   const encoded = path.getAttribute('data-points');
   if (!encoded) throw erCompatibilityError();
-  return Either.try(() => atob(encoded)).pipe(
-    Either.flatMap(decodeErPoints),
-    Either.getOrThrowWith(erCompatibilityError),
+  return Result.try(() => atob(encoded)).pipe(
+    Result.flatMap(decodeErPoints),
+    Result.getOrThrowWith(erCompatibilityError),
   );
 };

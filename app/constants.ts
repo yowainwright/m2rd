@@ -133,10 +133,14 @@ export const GRAPH_NAME_ERROR_ID = 'graph-name-error';
 
 export const APP_INITIAL_CONTEXT: AppContext = {
   isDesktop: null,
+  mermaidPanelCollapsed: false,
+  reactFlowPanelCollapsed: false,
   sidebarOpen: true,
   versionHistoryOpen: true,
   toolkitOpen: false,
   canvasRevision: 0,
+  viewportHistory: [],
+  viewportForwardHistory: [],
   needsRender: true,
   resetLayout: false,
   errorDialogDismissed: false,

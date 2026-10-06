@@ -11,9 +11,9 @@ export const GanttTaskSchema = Schema.Struct({
   task: Schema.String,
   section: Schema.String,
   processed: Schema.Literal(true),
-  startTime: Schema.ValidDateFromSelf,
-  endTime: Schema.ValidDateFromSelf,
-  renderEndTime: Schema.NullOr(Schema.ValidDateFromSelf),
+  startTime: Schema.Date,
+  endTime: Schema.Date,
+  renderEndTime: Schema.NullOr(Schema.Date),
   raw: Schema.Struct({ data: Schema.String }),
   done: Schema.optional(Schema.Boolean),
   active: Schema.optional(Schema.Boolean),
@@ -21,4 +21,4 @@ export const GanttTaskSchema = Schema.Struct({
   milestone: Schema.optional(Schema.Boolean),
   vert: Schema.optional(Schema.Literal(false)),
 });
-export const GanttTasksSchema = Schema.Array(GanttTaskSchema).pipe(Schema.minItems(1));
+export const GanttTasksSchema = Schema.Array(GanttTaskSchema).check(Schema.isMinLength(1));

@@ -85,6 +85,8 @@ const ACTIVE_DOCUMENT = appSetup.createStateConfig({
     'edges.style': { actions: 'updateStyles' },
     'canvas.update': { actions: 'updateCanvas' },
     'viewport.update': { actions: 'updateViewport' },
+    'viewport.back': { guard: 'canGoBackViewport', actions: 'goBackViewport' },
+    'viewport.forward': { guard: 'canGoForwardViewport', actions: 'goForwardViewport' },
     'input.update': {
       target: '.rendering',
       reenter: true,
@@ -238,6 +240,7 @@ export const APP_MACHINE_CONFIG = {
   context: APP_INITIAL_CONTEXT,
   on: {
     'layout.update': { actions: 'updateLayout' },
+    'layout.panel.update': { actions: 'updatePanelCollapse' },
     'sidebar.update': { actions: 'updateSidebar' },
     'version-history.update': { actions: 'updateVersionHistory' },
     'toolkit.update': { actions: 'updateToolkit' },

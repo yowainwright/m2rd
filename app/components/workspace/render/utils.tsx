@@ -1,5 +1,6 @@
 'use client';
 
+import { SlidersHorizontal } from 'lucide-react';
 import { useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import {
@@ -7,7 +8,6 @@ import {
   NodeToolbar,
   Position,
   ReactFlow,
-  ReactFlowProvider,
   Controls,
   useStore,
   useStoreApi,
@@ -63,6 +63,7 @@ import { ToolkitMetadata } from '@/app/components/toolkit/utils';
 import { Button } from '@/app/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { Separator } from '@/app/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { EDGE_ANCHOR_STYLE } from '@/app/constants';
 import { getSelectionLabel, handleReactFlowError } from '@/app/utils';
 import {
@@ -240,11 +241,9 @@ function GraphFlowContent(props: GraphCanvasProps) {
 
 export function GraphCanvas(props: GraphCanvasProps) {
   return (
-    <ReactFlowProvider key={props.canvasRevision}>
-      <ReactFlowErrorGate onError={handleReactFlowError}>
-        <GraphFlowContent {...props} />
-      </ReactFlowErrorGate>
-    </ReactFlowProvider>
+    <ReactFlowErrorGate onError={handleReactFlowError}>
+      <GraphFlowContent {...props} />
+    </ReactFlowErrorGate>
   );
 }
 
@@ -278,6 +277,29 @@ export function InitialViewportSync() {
   return null;
 }
 
+function RenderToolkitTrigger() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex shrink-0">
+          <PopoverTrigger asChild>
+            <Button
+              aria-label={TOOLKIT_LABELS.trigger}
+              className="h-8 w-8"
+              size="icon"
+              type="button"
+              variant="outline"
+            >
+              <SlidersHorizontal aria-hidden="true" className="size-4" />
+            </Button>
+          </PopoverTrigger>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{TOOLKIT_LABELS.trigger}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function RenderToolkit({
   canEditDraft,
   canvasTools,
@@ -290,11 +312,7 @@ export function RenderToolkit({
 }: RenderToolkitProps) {
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <Button size="sm" type="button" variant="outline">
-          {TOOLKIT_LABELS.trigger}: {metadata.scope}
-        </Button>
-      </PopoverTrigger>
+      <RenderToolkitTrigger />
       <PopoverContent
         align="end"
         aria-label={TOOLKIT_LABELS.title}
@@ -411,6 +429,8 @@ export const createRenderActions = (send: RenderSend) => {
   const handleNodes = (changes: NodeChange[]) => send({ type: 'nodes.update', changes });
   const handleEdges = (changes: EdgeChange[]) => send({ type: 'edges.update', changes });
   const handleLayout = () => send({ type: 'layout.reset' });
+  const handleViewportBack = () => send({ type: 'viewport.back' });
+  const handleViewportForward = () => send({ type: 'viewport.forward' });
   const handleViewport = (_event: MouseEvent | TouchEvent, viewport: Viewport) =>
     send({ type: 'viewport.update', viewport });
   return Object.assign({}, nodeActions, edgeActions, canvasActions, {
@@ -418,6 +438,8 @@ export const createRenderActions = (send: RenderSend) => {
     handleNodes,
     handleEdges,
     handleLayout,
+    handleViewportBack,
+    handleViewportForward,
     handleViewport,
   });
 };

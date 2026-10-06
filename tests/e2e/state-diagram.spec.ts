@@ -125,7 +125,7 @@ test('only offers fill styling for selected state symbols', async ({ page }) => 
   await expect(choice).toBeVisible();
   await page.getByRole('button', { name: 'fit view', exact: true }).click();
   await choice.click();
-  await page.getByRole('button', { name: 'Toolkit: 1 node' }).click();
+  await page.getByRole('button', { name: 'adj diagram' }).click();
   await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Text', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Border', { exact: true })).toHaveCount(0);
@@ -214,7 +214,7 @@ test('moves, styles, locks, and restores native state nodes without editing sour
   await page.getByRole('button', { name: 'fit view', exact: true }).click();
   const moved = await moveStateNode(page, node);
   await node.click();
-  await page.getByRole('button', { name: 'Toolkit: 1 node' }).click();
+  await page.getByRole('button', { name: 'adj diagram' }).click();
   await expect(page.getByLabel('Shape', { exact: true })).toHaveCount(0);
   await page.getByLabel('Fill', { exact: true }).fill('#ef4444');
   await expect(node.locator('[data-state-shape]')).toHaveCSS(

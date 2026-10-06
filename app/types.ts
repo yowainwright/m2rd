@@ -21,6 +21,8 @@ export type WorkspaceOperation =
 export type ExportRequest = { format: 'svg' | 'png' | 'gif'; repeat: GifExportRepeat };
 export type AppContext = {
   isDesktop: boolean | null;
+  mermaidPanelCollapsed: boolean;
+  reactFlowPanelCollapsed: boolean;
   sidebarOpen: boolean;
   versionHistoryOpen: boolean;
   toolkitOpen: boolean;
@@ -34,6 +36,8 @@ export type AppContext = {
   afterRename: WorkspaceOperation | null;
   exportError: string | null;
   loadRequest: WorkspaceRequest | null;
+  viewportHistory: Viewport[];
+  viewportForwardHistory: Viewport[];
   exportRequest: ExportRequest;
   input: GraphInput;
   translation: GraphTranslation;
@@ -45,6 +49,7 @@ export type AppContext = {
 export type AppEvent =
   | WorkspaceOperation
   | { type: 'layout.update'; isDesktop: boolean }
+  | { type: 'layout.panel.update'; panel: 'mermaid' | 'react-flow'; collapsed: boolean }
   | { type: 'sidebar.update'; open: boolean }
   | { type: 'version-history.update'; open: boolean }
   | { type: 'toolkit.update'; open: boolean }
@@ -59,6 +64,8 @@ export type AppEvent =
   | { type: 'edges.style'; settings: Partial<TranslationSettings> }
   | { type: 'canvas.update'; settings: Partial<GraphCanvasSettings> }
   | { type: 'viewport.update'; viewport: Viewport }
+  | { type: 'viewport.back' }
+  | { type: 'viewport.forward' }
   | { type: 'layout.reset' }
   | { type: 'error.dismiss' }
   | { type: 'error.view' }

@@ -25,9 +25,9 @@ export const stateCompatibilityError = () =>
   new GraphRenderError('unsupported', STATE_COMPATIBILITY_ERROR, 'stateDiagram');
 
 export const readStateLayout = (value: unknown): StateLayout => {
-  const result = Schema.decodeUnknownEither(StateLayoutSchema)(value);
-  if (result._tag === 'Left') throw stateCompatibilityError();
-  const layout = result.right;
+  const result = Schema.decodeUnknownResult(StateLayoutSchema)(value);
+  if (result._tag === 'Failure') throw stateCompatibilityError();
+  const layout = result.success;
   const nodes = new Map(layout.nodes.map((node) => [node.id, node]));
   const missingParent = layout.nodes.some((node) => node.parentId && !nodes.has(node.parentId));
   const missingEndpoint = layout.edges.some(

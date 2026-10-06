@@ -101,21 +101,21 @@
     "codemirror-lang-mermaid": "^0.5.0",
     "dexie": "4.4.6",
     "dompurify": "3.4.16",
-    "effect": "^3.22.2",
+    "effect": "^4.0.1",
     "elkjs": "0.12.0",
     "gifenc": "^1.0.3",
     "html-to-image": "^1.11.13",
-    "ink": "^7.1.1",
-    "jsdom": "^30.1.1",
-    "lucide-react": "^1.49.0",
-    "marked": "18.0.14",
-    "mermaid": "^12.0.0",
-    "motion": "^13.4.6",
+    "ink": "^8.0.0",
+    "jsdom": "^30.1.2",
+    "lucide-react": "^1.52.0",
+    "marked": "18.1.0",
+    "mermaid": "^12.1.0",
+    "motion": "^14.0.0",
     "next": "^16.3.8",
-    "pino": "^10.3.1",
+    "pino": "^10.4.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-resizable-panels": "^4.14.1",
+    "react-resizable-panels": "^4.14.2",
     "reactflow": "^11.11.4",
     "shaders": "^3.2.475",
     "string-width": "8.3.0",
@@ -129,7 +129,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/jsdom": "30.0.0",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/svgdom": "0.1.2",
@@ -137,15 +137,15 @@
     "codependence": "^1.0.15",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.14.5",
-    "oxfmt": "0.71.0",
-    "oxlint": "1.86.0",
+    "oxfmt": "0.72.0",
+    "oxlint": "1.87.0",
     "oxlint-plugin-legibility": "^0.0.5",
-    "pastoralist": "^1.13.6",
-    "postcss": "^8.5.28",
+    "pastoralist": "^1.13.8",
+    "postcss": "^8.5.29",
     "release-it": "21.1.0",
     "rolldown": "^1.2.12",
     "rollup-plugin-license": "^3.7.1",
-    "shadcn": "4.21.0",
+    "shadcn": "4.21.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
@@ -178,10 +178,10 @@
     "appendix": {
       "lodash-es@4.18.1": {
         "dependents": {
-          "m2rd": "lodash-es (required by @chevrotain/cst-dts-gen, @chevrotain/gast, chevrotain)"
+          "m2rd": "lodash-es (required by mermaid)"
         },
         "ledger": {
-          "addedDate": "2026-09-15T21:47:22.982Z",
+          "addedDate": "2026-10-05T20:00:21.493Z",
           "reason": "Replace Mermaid/Chevrotain's vulnerable lodash-es pin for GHSA-r5fr-rjxr-66jc and GHSA-f23m-r3pf-42rh. Remove when upstream resolves a patched version without this override.",
           "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc"
         }
@@ -200,10 +200,10 @@
       },
       "basic-ftp@6.2.1": {
         "dependents": {
-          "m2rd": "basic-ftp (required by get-uri)"
+          "m2rd": "basic-ftp (required by release-it)"
         },
         "ledger": {
-          "addedDate": "2026-10-02T07:32:13.763Z",
+          "addedDate": "2026-10-05T20:00:21.493Z",
           "reason": "Security fix: basic-ftp: Quadratic-time CPU denial of service in Client.list() Unix directory-listing parser (RE_LINE backtracking) (high)",
           "source": "security",
           "securityChecked": true,
@@ -223,6 +223,99 @@
           "url": "https://github.com/patrickjuchli/basic-ftp/security/advisories/GHSA-c475-qrg2-pj4r",
           "vulnerableRange": ">= 0 < 6.2.1",
           "patchedVersion": "6.2.1",
+          "sources": [
+            "osv"
+          ],
+          "confidence": "possible"
+        }
+      },
+      "proxy-addr@2.0.8": {
+        "dependents": {
+          "m2rd": "proxy-addr (required by shadcn)"
+        },
+        "ledger": {
+          "addedDate": "2026-10-06T01:02:24.934Z",
+          "reason": "Security fix: proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet (critical)",
+          "source": "security",
+          "securityChecked": true,
+          "securityCheckDate": "2026-10-06T01:02:24.963Z",
+          "securityProvider": "osv",
+          "cves": [
+            "CVE-2026-90711"
+          ],
+          "cveDetails": [
+            {
+              "cve": "CVE-2026-90711",
+              "severity": "critical",
+              "patchedVersion": "2.0.8"
+            }
+          ],
+          "severity": "critical",
+          "url": "https://github.com/jshttp/proxy-addr/security/advisories/GHSA-jqcg-44mw-7w3h",
+          "vulnerableRange": ">= 1.1.0 < 2.0.8",
+          "patchedVersion": "2.0.8",
+          "sources": [
+            "osv"
+          ],
+          "confidence": "possible"
+        }
+      },
+      "source-map-js@1.2.2": {
+        "dependents": {
+          "m2rd": "source-map-js (required by @tailwindcss/postcss, @testing-library/jest-dom, autoprefixer)"
+        },
+        "ledger": {
+          "addedDate": "2026-10-06T01:02:24.934Z",
+          "reason": "Security fix: source-map-js allows event-loop denial of service through indexed source-map section offsets (high)",
+          "source": "security",
+          "securityChecked": true,
+          "securityCheckDate": "2026-10-06T01:02:24.963Z",
+          "securityProvider": "osv",
+          "cves": [
+            "CVE-2026-93749"
+          ],
+          "cveDetails": [
+            {
+              "cve": "CVE-2026-93749",
+              "severity": "high",
+              "patchedVersion": "1.2.2"
+            }
+          ],
+          "severity": "high",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-93749",
+          "vulnerableRange": ">= 1.0.0 < 1.2.2",
+          "patchedVersion": "1.2.2",
+          "sources": [
+            "osv"
+          ],
+          "confidence": "possible"
+        }
+      },
+      "katex@0.19.0": {
+        "dependents": {
+          "m2rd": "katex (required by mermaid)"
+        },
+        "ledger": {
+          "addedDate": "2026-10-06T01:02:24.934Z",
+          "reason": "Security fix: KaTeX: Existing prototype pollution can bypass trust restrictions (low)",
+          "source": "security",
+          "securityChecked": true,
+          "securityCheckDate": "2026-10-06T01:02:24.963Z",
+          "securityProvider": "osv",
+          "cves": [
+            "CVE-2026-103923"
+          ],
+          "cveDetails": [
+            {
+              "cve": "CVE-2026-103923",
+              "severity": "low",
+              "patchedVersion": "0.18.2"
+            }
+          ],
+          "severity": "low",
+          "url": "https://github.com/KaTeX/KaTeX/security/advisories/GHSA-238p-pmpm-9mq7",
+          "vulnerableRange": ">= 0.11.0 < 0.18.2",
+          "patchedVersion": "0.18.2",
           "sources": [
             "osv"
           ],

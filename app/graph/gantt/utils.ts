@@ -12,9 +12,9 @@ export const ganttCompatibilityError = () =>
   );
 
 export const readGanttTasks = (value: unknown) => {
-  const decoded = Schema.decodeUnknownEither(GanttTasksSchema)(value);
-  if (decoded._tag === 'Left') throw ganttCompatibilityError();
-  const tasks = decoded.right;
+  const decoded = Schema.decodeUnknownResult(GanttTasksSchema)(value);
+  if (decoded._tag === 'Failure') throw ganttCompatibilityError();
+  const tasks = decoded.success;
   const ids = new Set(tasks.map((task) => task.id));
   const invalidDates = tasks.some((task) => task.endTime < task.startTime);
   const invalid = ids.size !== tasks.length || invalidDates;
