@@ -1,6 +1,6 @@
 {
   "name": "m2rd",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "private": true,
   "description": "m2rd — Mermaid to React Diagrams",
   "author": "Jeff Wainwright <me@jeffry.in> (https://jeffry.in)",
