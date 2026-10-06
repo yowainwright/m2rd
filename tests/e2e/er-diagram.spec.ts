@@ -64,7 +64,7 @@ test('retains tiled rows, movement, and relationships through save and reload', 
   await expect(node).not.toHaveAttribute('style', before!);
   const moved = await node.getAttribute('style');
   await node.click();
-  await page.getByRole('button', { name: 'Toolkit: 1 node' }).click();
+  await page.getByRole('button', { name: 'adj diagram' }).click();
   await expect(page.getByLabel('Shape', { exact: true })).toHaveCount(0);
   await page.getByLabel('Fill', { exact: true }).fill('#ef4444');
   await page.getByLabel('Surface', { exact: true }).click();
@@ -97,7 +97,7 @@ test('keeps parallel and self relationships distinct after source reordering', a
   const id = await owned.getAttribute('data-testid');
   await owned.focus();
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Toolkit: 1 edge', exact: true }).click();
+  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
   await page.getByLabel('Color', { exact: true }).fill('#ef4444');
   await page.keyboard.press('Escape');
   await updateSource(page, `erDiagram\n${shares}\n${recursive}\n${owns}\n${shares}`);

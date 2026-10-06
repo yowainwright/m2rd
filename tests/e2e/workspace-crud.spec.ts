@@ -269,6 +269,17 @@ const togglePanelFocusAndRestore = async (page: Page, panel: 'mermaid' | 'react-
     .toBeLessThan(2);
 };
 
+const panCanvas = async (page: Page, deltaX: number) => {
+  const pane = page.locator('.react-flow__pane');
+  const bounds = await getBounds(pane);
+  const startX = bounds.x + bounds.width - 16;
+  const startY = bounds.y + bounds.height - 16;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + deltaX, startY, { steps: 8 });
+  await page.mouse.up();
+};
+
 const writeLegacyRecords = () =>
   new Promise<void>((resolve, reject) => {
     const request = indexedDB.open('m2rd');
@@ -342,7 +353,7 @@ const setGlobalMarkers = async (page: Page) => {
 const verifyReloadedEdgeMarkers = async (page: Page, firstEdge: Locator, secondEdge: Locator) => {
   await page.reload();
   await expect(firstEdge).toBeVisible();
-  await page.getByRole('button', { name: 'Toolkit: 1 edge', exact: true }).click();
+  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Marker', exact: true })).toHaveText('None');
   await expect.poll(() => readMarker(firstEdge)).toBeNull();
   await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke', 'rgb(34, 197, 94)');
@@ -399,7 +410,7 @@ const createRemainingVersions = async (page: Page, viewport: Locator, firstCamer
   await editSnapshot(page, 2);
   const node = page.locator('.react-flow__node[data-id="A"]');
   await node.click();
-  await page.getByRole('button', { name: 'Toolkit: 1 node' }).click();
+  await page.getByRole('button', { name: 'adj diagram' }).click();
   await setColorInput(page.getByLabel('Fill'), '#22c55e');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'zoom in', exact: true }).click();
@@ -419,7 +430,7 @@ const createStyledVersion = async (page: Page) => {
   await page.goto('./');
   await editSnapshot(page, 1);
   await renameGraph(page, 'Versioned diagram');
-  await page.getByRole('button', { name: 'Toolkit: Global' }).click();
+  await page.getByRole('button', { name: 'adj diagram' }).click();
   await setColorInput(page.getByLabel('Fill'), '#ef4444');
   await page.keyboard.press('Escape');
   await saveSnapshot(page, 1);
@@ -577,7 +588,7 @@ const selectMarker = async (page: Page, name: string) => {
 const openToolkit = async (page: Page) => {
   const background = page.getByRole('combobox', { name: 'Background', exact: true });
   const isOpen = await background.isVisible();
-  if (!isOpen) await page.getByRole('button', { name: 'Toolkit: Global', exact: true }).click();
+  if (!isOpen) await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
   await expect(background).toBeVisible();
 };
 
@@ -909,7 +920,7 @@ test('changes edge markers and matching colors globally and per edge, then resto
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'fit view', exact: true }).click();
   await firstEdge.click();
-  await page.getByRole('button', { name: 'Toolkit: 1 edge', exact: true }).click();
+  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
   await selectMarker(page, 'Filled arrow');
   await setColorInput(page.getByLabel('Color', { exact: true }), '#2563eb');
   await page.getByRole('spinbutton', { name: 'Width' }).fill('0');
@@ -948,7 +959,7 @@ test('loads legacy marker colors, oversized edges, and untitled names', async ({
   await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke-width', '8px');
   const graphName = page.getByRole('button', { name: 'Rename graph', exact: true });
   await expect(graphName).toHaveText(/^[a-f0-9-]{36}$/);
-  await page.getByRole('button', { name: 'Toolkit: Global', exact: true }).click();
+  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Marker', exact: true })).toHaveText(
     'Filled arrow',
   );
@@ -1130,6 +1141,50 @@ test('focus toggles reverse chevrons and restore the resized panel split', async
   await togglePanelFocusAndRestore(page, 'react-flow');
 });
 
+test('disables export while the React Flow preview is hidden', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
+
+  const exportButton = page.getByRole('button', { name: 'Download' });
+  const focusEditor = page.getByRole('button', { name: 'Toggle focus for Mermaid input pane' });
+  await expect(exportButton).toBeEnabled();
+  await focusEditor.click();
+  await expect(page.locator('#flow-panel')).toHaveCSS('width', '0px');
+  await expect(exportButton).toBeDisabled();
+
+  await focusEditor.click();
+  await expect(exportButton).toBeEnabled();
+});
+
+test('viewport history supports back, forward, and a new move', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('./');
+  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
+
+  const viewport = page.locator('.react-flow__viewport');
+  const initialViewport = await viewport.getAttribute('style');
+  await panCanvas(page, 60);
+  await expect.poll(() => viewport.getAttribute('style')).not.toBe(initialViewport);
+  const firstViewport = await viewport.getAttribute('style');
+  await panCanvas(page, 60);
+  await expect.poll(() => viewport.getAttribute('style')).not.toBe(firstViewport);
+  const secondViewport = await viewport.getAttribute('style');
+
+  const back = page.getByRole('button', { name: 'Prev', exact: true });
+  const forward = page.getByRole('button', { name: 'Redo', exact: true });
+  await expect(back).toBeEnabled();
+  await expect(forward).toBeDisabled();
+  await back.click();
+  await expect.poll(() => viewport.getAttribute('style')).toBe(firstViewport);
+  await expect(forward).toBeEnabled();
+  await forward.click();
+  await expect.poll(() => viewport.getAttribute('style')).toBe(secondViewport);
+
+  await panCanvas(page, -60);
+  await expect.poll(() => viewport.getAttribute('style')).not.toBe(secondViewport);
+  await expect(forward).toBeDisabled();
+});
+
 test('stacks the editor above the canvas on mobile', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./');
@@ -1169,7 +1224,7 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
   await node.click();
   await expect(page.getByText('Node selected')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Toolkit: 1 node' }).click();
+  await page.getByRole('button', { name: 'adj diagram' }).click();
   await setColorInput(page.getByLabel('Fill'), '#ef4444');
   await expect(node).toHaveCSS('background-color', 'rgb(239, 68, 68)');
 
@@ -1185,7 +1240,7 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
   await expect(reloadedNode).toHaveCSS('background-color', 'rgb(239, 68, 68)');
   await reloadedNode.click();
   await expect(page.getByText('Node selected')).toBeVisible();
-  await page.getByRole('button', { name: 'Toolkit: 1 node', exact: true }).click();
+  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
   await expect(page.getByLabel('Fill')).toBeVisible();
   await expect(page.getByLabel('Fill')).toHaveValue('#ef4444');
 

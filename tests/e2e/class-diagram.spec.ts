@@ -194,7 +194,7 @@ test('keeps class semantics, movement, and appearance through save, reload, and 
   await page.getByRole('button', { name: 'fit view', exact: true }).click();
   const moved = await moveClassNode(page, node);
   await node.click();
-  await page.getByRole('button', { name: 'Toolkit: 1 node' }).click();
+  await page.getByRole('button', { name: 'adj diagram' }).click();
   await expect(page.getByLabel('Shape', { exact: true })).toHaveCount(0);
   await page.getByLabel('Fill', { exact: true }).fill('#ef4444');
   await page.keyboard.press('Escape');
@@ -269,7 +269,7 @@ test('keeps parallel relation appearance attached to its meaning after insertion
   const originalId = await owned.getAttribute('data-testid');
   await owned.focus();
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Toolkit: 1 edge', exact: true }).click();
+  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
   await page.getByLabel('Color', { exact: true }).fill('#ef4444');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Save', exact: true }).click();

@@ -327,8 +327,10 @@ export const appSetup = titleSetup.extend({
     canStartExport: and([stateIn({ document: 'active' }), 'canExport']),
     canExport: ({ context }) => {
       const hasNodes = context.translation.elements.nodes.length > 0;
-      const hasError = context.translation.error !== null;
-      const canExport = hasNodes && !hasError && !context.needsRender;
+      const isValidDiagram = context.translation.error === null;
+      const isRendered = !context.needsRender;
+      const hasVisiblePreview = !context.reactFlowPanelCollapsed;
+      const canExport = hasNodes && isValidDiagram && isRendered && hasVisiblePreview;
       return canExport;
     },
   },
