@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../..');
+const cache = resolve(root, '.next/cache');
 const workflow = readFileSync(resolve(root, '.github/workflows/gh-pages.yml'), 'utf8');
 const block = workflow.match(
   /      - name: Resolve release revision[\s\S]*?        run: \|\n((?:          .*\n)+)/,
@@ -19,7 +20,8 @@ const gitStub = `git() {
 }`;
 
 const resolveRevision = (event: string, released = '', head = 'checked-main') => {
-  const directory = mkdtempSync(resolve(root, '.next/cache/release-test-'));
+  mkdirSync(cache, { recursive: true });
+  const directory = mkdtempSync(resolve(cache, 'release-test-'));
   const outputFile = resolve(directory, 'output');
   const env = Object.assign({}, process.env, {
     EVENT_NAME: event,

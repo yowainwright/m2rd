@@ -31,7 +31,7 @@
     "deps:check": "codependence",
     "deps:overrides": "pastoralist",
     "deps:security": "pastoralist --dry-run --checkSecurity --hasWorkspaceSecurityChecks --strict",
-    "deps:audit": "pnpm audit",
+    "deps:audit": "pnpm audit --audit-level moderate",
     "format": "oxfmt -c scripts/.oxfmtrc.json --write . '!next-env.d.ts' '!pnpm-lock.yaml' '!AGENTS.md'",
     "format:check": "oxfmt -c scripts/.oxfmtrc.json --check . '!next-env.d.ts' '!pnpm-lock.yaml' '!AGENTS.md'",
     "lint": "pnpm run lint:all",
@@ -75,81 +75,86 @@
         "path": "package.json",
         "manager": "pnpm",
         "mode": "precise",
+        "codependencies": [
+          {
+            "jsdom": "30.1.2"
+          }
+        ],
         "lockfile": true
       }
     }
   },
   "dependencies": {
-    "@codemirror/lint": "^6.9.7",
-    "@codemirror/view": "^6.43.13",
+    "@codemirror/lint": "^6.9.8",
+    "@codemirror/view": "^6.43.15",
     "@pinojs/redact": "^0.4.0",
-    "@radix-ui/react-dialog": "^1.1.23",
-    "@radix-ui/react-dropdown-menu": "^2.1.24",
-    "@radix-ui/react-label": "^2.1.15",
-    "@radix-ui/react-popover": "^1.1.23",
-    "@radix-ui/react-select": "^2.3.7",
-    "@radix-ui/react-separator": "^1.1.15",
-    "@radix-ui/react-slider": "^1.4.7",
-    "@radix-ui/react-slot": "^1.3.3",
-    "@radix-ui/react-switch": "^1.3.7",
-    "@radix-ui/react-toggle": "^1.1.18",
-    "@radix-ui/react-toggle-group": "^1.1.19",
-    "@radix-ui/react-tooltip": "^1.2.16",
+    "@radix-ui/react-dialog": "^1.3.1",
+    "@radix-ui/react-dropdown-menu": "^2.2.1",
+    "@radix-ui/react-label": "^2.1.17",
+    "@radix-ui/react-popover": "^1.3.1",
+    "@radix-ui/react-select": "^2.4.1",
+    "@radix-ui/react-separator": "^1.2.0",
+    "@radix-ui/react-slider": "^1.6.1",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@radix-ui/react-switch": "^1.4.1",
+    "@radix-ui/react-toggle": "^1.2.1",
+    "@radix-ui/react-toggle-group": "^1.2.1",
+    "@radix-ui/react-tooltip": "^1.4.1",
     "@uiw/react-codemirror": "^4.25.12",
     "@xstate/react": "^6.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "codemirror-lang-mermaid": "^0.5.0",
-    "dexie": "4.4.6",
-    "dompurify": "3.4.16",
-    "effect": "^4.0.1",
-    "elkjs": "0.12.0",
+    "dexie": "4.4.7",
+    "dompurify": "3.4.17",
+    "effect": "^4.1.4",
+    "elkjs": "0.12.1",
     "gifenc": "^1.0.3",
     "html-to-image": "^1.11.13",
     "ink": "^8.0.0",
-    "jsdom": "^30.1.2",
-    "lucide-react": "^1.52.0",
-    "marked": "18.1.0",
-    "mermaid": "^12.1.0",
-    "motion": "^14.0.0",
-    "next": "^16.3.8",
+    "jsdom": "30.1.2",
+    "lucide-react": "^1.73.0",
+    "marked": "18.2.0",
+    "mermaid": "^12.3.0",
+    "motion": "^14.14.0",
+    "next": "^16.4.6",
     "pino": "^10.4.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "react-resizable-panels": "^4.14.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-resizable-panels": "^4.22.1",
     "reactflow": "^11.11.4",
-    "shaders": "^3.2.475",
-    "string-width": "8.3.0",
+    "shaders": "^4.0.7",
+    "string-width": "9.0.0",
     "svgdom": "0.1.29",
     "tailwind-merge": "^3.7.0",
-    "xstate": "^5.33.2"
+    "xstate": "^5.33.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
-    "@tailwindcss/postcss": "^4.3.3",
+    "@playwright/test": "^1.65.1",
+    "@tailwindcss/postcss": "^4.3.5",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/jsdom": "30.0.0",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/svgdom": "0.1.2",
-    "autoprefixer": "^10.6.1",
-    "codependence": "^1.0.15",
-    "fake-indexeddb": "^6.2.5",
-    "happy-dom": "^20.14.5",
-    "oxfmt": "0.72.0",
-    "oxlint": "1.87.0",
+    "autoprefixer": "^10.6.2",
+    "codependence": "^1.0.16",
+    "fake-indexeddb": "^6.2.8",
+    "happy-dom": "^21.0.4",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
     "oxlint-plugin-legibility": "^0.0.5",
-    "pastoralist": "^1.13.8",
-    "postcss": "^8.5.29",
-    "release-it": "21.1.0",
-    "rolldown": "^1.2.12",
-    "rollup-plugin-license": "^3.7.1",
-    "shadcn": "4.21.2",
-    "tailwindcss": "^4.3.3",
+    "pastoralist": "^1.14.2",
+    "postcss": "^8.5.33",
+    "release-it": "21.1.2",
+    "rolldown": "^1.3.2",
+    "rollup-plugin-license": "^3.7.2",
+    "shadcn": "4.23.0",
+    "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "release-it": {
     "git": {
@@ -176,6 +181,9 @@
     }
   },
   "pastoralist": {
+    "security": {
+      "severityThreshold": "medium"
+    },
     "appendix": {
       "lodash-es@4.18.1": {
         "dependents": {
@@ -187,74 +195,59 @@
           "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc"
         }
       },
-      "undici@7.29.0@7.29.1": {
+      "undici@7.29.0@7.30.2": {
         "dependents": {
           "m2rd": "undici@7.29.0 (transitive dependency)"
         },
         "ledger": {
           "addedDate": "2026-09-30T05:27:17.253Z",
-          "reason": "Replace release-it 21.0.3's vulnerable undici 7.29.0 pin with 7.29.1. Remove when release-it declares a patched version. Scoped to 7.29.0 to preserve other undici versions.",
+          "reason": "Patch dotenvx's exact undici@7.29.0 dependency to 7.30.2 for the current Undici advisories. Remove when dotenvx updates its pin; scope this override to preserve other Undici versions.",
           "source": "security",
-          "url": "https://github.com/advisories/GHSA-rfgv-xxqx-mfg5",
-          "patchedVersion": "7.29.1"
+          "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+          "patchedVersion": "7.30.1",
+          "cves": [
+            "CVE-2026-109383",
+            "CVE-2026-109829",
+            "CVE-2026-87018",
+            "CVE-2026-109869",
+            "CVE-2026-109924",
+            "CVE-2026-87029",
+            "CVE-2026-109932",
+            "CVE-2026-109841"
+          ]
         }
       },
-      "basic-ftp@6.2.1": {
+      "basic-ftp@6.2.4": {
         "dependents": {
           "m2rd": "basic-ftp (required by release-it)"
         },
         "ledger": {
-          "addedDate": "2026-10-05T20:00:21.493Z",
-          "reason": "Security fix: basic-ftp: Quadratic-time CPU denial of service in Client.list() Unix directory-listing parser (RE_LINE backtracking) (high)",
+          "addedDate": "2026-11-14T07:34:20.588Z",
+          "reason": "Security fix: basic-ftp: Uncaught TypeError in MLSD directory-listing parser via __proto__ fact name causes DoS in Client.list() (medium)",
           "source": "security",
           "securityChecked": true,
-          "securityCheckDate": "2026-10-02T07:32:13.766Z",
+          "securityCheckDate": "2026-11-14T07:34:20.615Z",
           "securityProvider": "osv",
           "cves": [
-            "CVE-2026-102990"
+            "CVE-2026-126345",
+            "CVE-2026-126346"
           ],
           "cveDetails": [
             {
-              "cve": "CVE-2026-102990",
-              "severity": "high",
-              "patchedVersion": "6.2.1"
-            }
-          ],
-          "severity": "high",
-          "url": "https://github.com/patrickjuchli/basic-ftp/security/advisories/GHSA-c475-qrg2-pj4r",
-          "vulnerableRange": ">= 0 < 6.2.1",
-          "patchedVersion": "6.2.1",
-          "sources": [
-            "osv"
-          ],
-          "confidence": "possible"
-        }
-      },
-      "proxy-addr@2.0.8": {
-        "dependents": {
-          "m2rd": "proxy-addr (required by shadcn)"
-        },
-        "ledger": {
-          "addedDate": "2026-10-06T01:02:24.934Z",
-          "reason": "Security fix: proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet (critical)",
-          "source": "security",
-          "securityChecked": true,
-          "securityCheckDate": "2026-10-06T01:02:24.963Z",
-          "securityProvider": "osv",
-          "cves": [
-            "CVE-2026-90711"
-          ],
-          "cveDetails": [
+              "cve": "CVE-2026-126345",
+              "severity": "medium",
+              "patchedVersion": "6.2.4"
+            },
             {
-              "cve": "CVE-2026-90711",
-              "severity": "critical",
-              "patchedVersion": "2.0.8"
+              "cve": "CVE-2026-126346",
+              "severity": "medium",
+              "patchedVersion": "6.2.3"
             }
           ],
-          "severity": "critical",
-          "url": "https://github.com/jshttp/proxy-addr/security/advisories/GHSA-jqcg-44mw-7w3h",
-          "vulnerableRange": ">= 1.1.0 < 2.0.8",
-          "patchedVersion": "2.0.8",
+          "severity": "medium",
+          "url": "https://github.com/patrickjuchli/basic-ftp/security/advisories/GHSA-5pm8-86m8-9m6r",
+          "vulnerableRange": ">= 0 < 6.2.4",
+          "patchedVersion": "6.2.4",
           "sources": [
             "osv"
           ],
@@ -317,6 +310,37 @@
           "url": "https://github.com/KaTeX/KaTeX/security/advisories/GHSA-238p-pmpm-9mq7",
           "vulnerableRange": ">= 0.11.0 < 0.18.2",
           "patchedVersion": "0.18.2",
+          "sources": [
+            "osv"
+          ],
+          "confidence": "possible"
+        }
+      },
+      "minimatch@11.0.1": {
+        "dependents": {
+          "m2rd": "minimatch (required by shadcn)"
+        },
+        "ledger": {
+          "addedDate": "2026-11-14T07:34:20.588Z",
+          "reason": "Security fix: minimatch has potential denial of service via globparts amplification (medium)",
+          "source": "security",
+          "securityChecked": true,
+          "securityCheckDate": "2026-11-14T07:34:20.615Z",
+          "securityProvider": "osv",
+          "cves": [
+            "CVE-2026-118764"
+          ],
+          "cveDetails": [
+            {
+              "cve": "CVE-2026-118764",
+              "severity": "medium",
+              "patchedVersion": "11.0.1"
+            }
+          ],
+          "severity": "medium",
+          "url": "https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249",
+          "vulnerableRange": ">= 7.0.0 < 11.0.1",
+          "patchedVersion": "11.0.1",
           "sources": [
             "osv"
           ],

@@ -187,7 +187,7 @@ const initializeMermaid = (config: MermaidConfig = {}) => {
   const sanitizingWindow = new JSDOM('').window;
   Object.assign(createDOMPurify, createDOMPurify(sanitizingWindow));
   const window = createHTMLWindow();
-  Object.assign(window, { Error, Math, Array, Function, CSS: sanitizingWindow.CSS });
+  Object.assign(window, { Error, Math, Array, Function, Map, CSS: sanitizingWindow.CSS });
   Object.assign(globalThis, {
     window,
     document: window.document,
