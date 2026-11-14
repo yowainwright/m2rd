@@ -13,23 +13,29 @@ import { JSDOM } from 'jsdom';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../..');
+
 const temporary = resolve(root, 'tmp');
+
 mkdirSync(temporary, { recursive: true });
+
 const directory = mkdtempSync(resolve(temporary, 'cli-package-test-'));
-const buildDirectories = () => {
-  const entries = readdirSync(temporary);
-  return entries.filter((name) => name.startsWith('cli-package-')).sort();
-};
+
 const previousDirectories = buildDirectories();
+
 const installation = resolve(directory, 'install');
+
 const project = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+
 const installed = resolve(installation, 'node_modules', project.name);
+
 const cli = resolve(installation, 'node_modules/.bin/m2rd');
+
 const permissions = [
   '--permission',
   `--allow-fs-read=${directory}`,
   `--allow-fs-write=${directory}`,
 ];
+
 const env: NodeJS.ProcessEnv = {
   PATH: process.env.PATH,
   NODE_ENV: 'production',
@@ -37,24 +43,8 @@ const env: NodeJS.ProcessEnv = {
   DEV: 'true',
   FORCE_COLOR: '0',
 };
-let artifact: { path: string; bytes: number; unpackedBytes: number };
 
-const install = (archive: string) => {
-  const args = [
-    'install',
-    '--prefix',
-    installation,
-    '--offline',
-    '--ignore-scripts',
-    '--no-audit',
-    '--no-fund',
-    '--package-lock=false',
-    '--cache',
-    resolve(directory, 'cache'),
-    archive,
-  ];
-  execFileSync('npm', args, { cwd: directory, encoding: 'utf8', timeout: 60_000 });
-};
+let artifact: { path: string; bytes: number; unpackedBytes: number };
 
 beforeAll(() => {
   const script = resolve(root, 'scripts/cli/index.ts');
@@ -68,35 +58,6 @@ beforeAll(() => {
 }, 180_000);
 
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
-
-const run = (args: string[], input = '') => {
-  const result = spawnSync(process.execPath, [...permissions, cli, ...args], {
-    cwd: directory,
-    input,
-    env,
-    encoding: 'utf8',
-    timeout: 30_000,
-  });
-  expect(result.error).toBeUndefined();
-  expect(result.signal).toBeNull();
-  return result;
-};
-
-const expectSuccess = (result: ReturnType<typeof run>) => {
-  expect(result.stderr).toBe('');
-  expect(result.status).toBe(0);
-};
-
-const expectSvg = (path: string, label: string) => {
-  const image = new JSDOM(readFileSync(path, 'utf8'), { contentType: 'image/svg+xml' });
-  try {
-    const svg = image.window.document.documentElement;
-    expect(svg.localName).toBe('svg');
-    expect(svg.textContent).toContain(label);
-  } finally {
-    image.window.close();
-  }
-};
 
 test('installs an npm command without runtime dependencies or lifecycle scripts', () => {
   const manifest = JSON.parse(readFileSync(resolve(installed, 'package.json'), 'utf8'));
@@ -216,3 +177,54 @@ test('preserves an existing output file', () => {
   expect(result.stderr).toContain('EEXIST');
   expect(readFileSync(output, 'utf8')).toBe('original');
 });
+
+function buildDirectories() {
+  const entries = readdirSync(temporary);
+  return entries.filter((name) => name.startsWith('cli-package-')).sort();
+}
+
+function install(archive: string) {
+  const args = [
+    'install',
+    '--prefix',
+    installation,
+    '--offline',
+    '--ignore-scripts',
+    '--no-audit',
+    '--no-fund',
+    '--package-lock=false',
+    '--cache',
+    resolve(directory, 'cache'),
+    archive,
+  ];
+  execFileSync('npm', args, { cwd: directory, encoding: 'utf8', timeout: 60_000 });
+}
+
+function run(args: string[], input = '') {
+  const result = spawnSync(process.execPath, [...permissions, cli, ...args], {
+    cwd: directory,
+    input,
+    env,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.signal).toBeNull();
+  return result;
+}
+
+function expectSuccess(result: ReturnType<typeof run>) {
+  expect(result.stderr).toBe('');
+  expect(result.status).toBe(0);
+}
+
+function expectSvg(path: string, label: string) {
+  const image = new JSDOM(readFileSync(path, 'utf8'), { contentType: 'image/svg+xml' });
+  try {
+    const svg = image.window.document.documentElement;
+    expect(svg.localName).toBe('svg');
+    expect(svg.textContent).toContain(label);
+  } finally {
+    image.window.close();
+  }
+}

@@ -41,6 +41,83 @@ import {
   REPOSITORY_URL,
 } from './constants';
 
+type WorkspaceRowProps = {
+  workspace: GraphWorkspace;
+  navigation: ReturnType<typeof useWorkspaceNavigation>;
+};
+
+export function WorkspaceSidebar() {
+  return (
+    <Sidebar>
+      <WorkspaceSidebarHeader />
+      <WorkspaceList />
+      <WorkspaceCredits />
+    </Sidebar>
+  );
+}
+
+function WorkspaceList() {
+  const workspaces = AppContext.useSelector((state) => state.context.workspaces);
+  const navigation = useWorkspaceNavigation();
+  const items = workspaces.map((workspace) => (
+    <WorkspaceRow key={workspace.id} workspace={workspace} navigation={navigation} />
+  ));
+  const isEmpty = workspaces.length === 0;
+  const graphList = isEmpty ? <WorkspaceEmptyState /> : <SidebarMenu>{items}</SidebarMenu>;
+  return (
+    <SidebarContent className="overflow-hidden">
+      <SidebarGroup className="min-h-0 flex-1">
+        <SidebarGroupLabel asChild>
+          <h2>Saved graphs</h2>
+        </SidebarGroupLabel>
+        <SidebarGroupContent className="min-h-0 flex-1 overflow-y-auto">
+          <nav aria-label="Saved graphs">{graphList}</nav>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </SidebarContent>
+  );
+}
+
+function WorkspaceRow({ workspace, navigation }: WorkspaceRowProps) {
+  const { activeId, disabled, versionHistoryOpen, handleWorkspaceClick } = navigation;
+  const label = getWorkspaceLabel(workspace);
+  const isActive = workspace.id === activeId;
+  return (
+    <SidebarMenuItem key={workspace.id}>
+      <SidebarMenuButton
+        aria-expanded={isActive ? versionHistoryOpen : false}
+        disabled={disabled}
+        isActive={isActive}
+        onClick={() => handleWorkspaceClick(workspace.id)}
+        title={label}
+        type="button"
+      >
+        <ChevronRight
+          aria-hidden="true"
+          className={cn('transition-transform', isActive && versionHistoryOpen && 'rotate-90')}
+        />
+        <Workflow aria-hidden="true" />
+        <span>{label}</span>
+      </SidebarMenuButton>
+      <WorkspaceVersionHistory workspace={workspace} navigation={navigation} />
+    </SidebarMenuItem>
+  );
+}
+
+function WorkspaceVersionHistory({ workspace, navigation }: WorkspaceRowProps) {
+  const isActive = workspace.id === navigation.activeId;
+  const isOpen = isActive && navigation.versionHistoryOpen;
+  if (!isOpen) return null;
+  return (
+    <VersionTree
+      activeId={navigation.activeVersionId}
+      disabled={navigation.disabled}
+      onSelect={navigation.handleVersionSelect}
+      versions={navigation.versionItems}
+    />
+  );
+}
+
 function useWorkspaceNavigation() {
   const { send } = AppContext.useActorRef();
   const activeId = AppContext.useSelector((state) => state.context.workspace.id);
@@ -80,70 +157,17 @@ function useWorkspaceNavigation() {
   };
 }
 
-type WorkspaceRowProps = {
-  workspace: GraphWorkspace;
-  navigation: ReturnType<typeof useWorkspaceNavigation>;
-};
-
-function WorkspaceVersionHistory({ workspace, navigation }: WorkspaceRowProps) {
-  const isActive = workspace.id === navigation.activeId;
-  const isOpen = isActive && navigation.versionHistoryOpen;
-  if (!isOpen) return null;
+function WorkspaceSidebarHeader() {
   return (
-    <VersionTree
-      activeId={navigation.activeVersionId}
-      disabled={navigation.disabled}
-      onSelect={navigation.handleVersionSelect}
-      versions={navigation.versionItems}
-    />
-  );
-}
-
-function WorkspaceRow({ workspace, navigation }: WorkspaceRowProps) {
-  const { activeId, disabled, versionHistoryOpen, handleWorkspaceClick } = navigation;
-  const label = getWorkspaceLabel(workspace);
-  const isActive = workspace.id === activeId;
-  return (
-    <SidebarMenuItem key={workspace.id}>
-      <SidebarMenuButton
-        aria-expanded={isActive ? versionHistoryOpen : false}
-        disabled={disabled}
-        isActive={isActive}
-        onClick={() => handleWorkspaceClick(workspace.id)}
-        title={label}
-        type="button"
-      >
-        <ChevronRight
-          aria-hidden="true"
-          className={cn('transition-transform', isActive && versionHistoryOpen && 'rotate-90')}
-        />
-        <Workflow aria-hidden="true" />
-        <span>{label}</span>
-      </SidebarMenuButton>
-      <WorkspaceVersionHistory workspace={workspace} navigation={navigation} />
-    </SidebarMenuItem>
-  );
-}
-
-function WorkspaceList() {
-  const workspaces = AppContext.useSelector((state) => state.context.workspaces);
-  const navigation = useWorkspaceNavigation();
-  const items = workspaces.map((workspace) => (
-    <WorkspaceRow key={workspace.id} workspace={workspace} navigation={navigation} />
-  ));
-  const isEmpty = workspaces.length === 0;
-  const graphList = isEmpty ? <WorkspaceEmptyState /> : <SidebarMenu>{items}</SidebarMenu>;
-  return (
-    <SidebarContent className="overflow-hidden">
-      <SidebarGroup className="min-h-0 flex-1">
-        <SidebarGroupLabel asChild>
-          <h2>Saved graphs</h2>
-        </SidebarGroupLabel>
-        <SidebarGroupContent className="min-h-0 flex-1 overflow-y-auto">
-          <nav aria-label="Saved graphs">{graphList}</nav>
-        </SidebarGroupContent>
-      </SidebarGroup>
-    </SidebarContent>
+    <SidebarHeader className="min-h-12 border-b px-4 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold">m2rd</p>
+          <p className="text-[10px] leading-3 text-muted-foreground">mermaid to react diagrams</p>
+        </div>
+        <CloseSidebarButton />
+      </div>
+    </SidebarHeader>
   );
 }
 
@@ -174,30 +198,6 @@ function CloseSidebarButton() {
   );
 }
 
-function WorkspaceSidebarHeader() {
-  return (
-    <SidebarHeader className="min-h-12 border-b px-4 py-2">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold">m2rd</p>
-          <p className="text-[10px] leading-3 text-muted-foreground">mermaid to react diagrams</p>
-        </div>
-        <CloseSidebarButton />
-      </div>
-    </SidebarHeader>
-  );
-}
-
-export function WorkspaceSidebar() {
-  return (
-    <Sidebar>
-      <WorkspaceSidebarHeader />
-      <WorkspaceList />
-      <WorkspaceCredits />
-    </Sidebar>
-  );
-}
-
 function WorkspaceEmptyState() {
   return (
     <Empty className="p-4 md:p-4">
@@ -209,6 +209,30 @@ function WorkspaceEmptyState() {
         <EmptyDescription className="text-xs">{EMPTY_GRAPHS.description}</EmptyDescription>
       </EmptyHeader>
     </Empty>
+  );
+}
+
+function WorkspaceCredits() {
+  return (
+    <SidebarFooter className="shrink-0 items-center gap-3 border-t border-sidebar-border px-2 pt-4 pb-6 text-center text-xs text-muted-foreground">
+      <p className="w-full px-6 text-left text-xs leading-5">
+        <a
+          href={REPOSITORY_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="hover:underline focus-visible:underline"
+        >
+          m2rd
+        </a>{' '}
+        {FOOTER_SUPPORTED_DIAGRAMS}
+      </p>
+      <Separator className="bg-sidebar-border" />
+      <WorkspaceCreditLinks />
+      <Separator className="bg-sidebar-border" />
+      <p className="px-2">
+        {APP_VERSION} · {APP_LICENSE} · {CURRENT_YEAR}
+      </p>
+    </SidebarFooter>
   );
 }
 
@@ -243,29 +267,5 @@ function WorkspaceCreditLinks() {
         <ul className="flex justify-center gap-3 whitespace-nowrap">{frameworkCredits}</ul>
       </li>
     </ul>
-  );
-}
-
-function WorkspaceCredits() {
-  return (
-    <SidebarFooter className="shrink-0 items-center gap-3 border-t border-sidebar-border px-2 pt-4 pb-6 text-center text-xs text-muted-foreground">
-      <p className="w-full px-6 text-left text-xs leading-5">
-        <a
-          href={REPOSITORY_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="hover:underline focus-visible:underline"
-        >
-          m2rd
-        </a>{' '}
-        {FOOTER_SUPPORTED_DIAGRAMS}
-      </p>
-      <Separator className="bg-sidebar-border" />
-      <WorkspaceCreditLinks />
-      <Separator className="bg-sidebar-border" />
-      <p className="px-2">
-        {APP_VERSION} · {APP_LICENSE} · {CURRENT_YEAR}
-      </p>
-    </SidebarFooter>
   );
 }

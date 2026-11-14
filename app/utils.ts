@@ -50,30 +50,10 @@ mermaid.initialize({
   startOnLoad: false,
   themeVariables: { rectBkgColor: 'transparent' },
 });
+
 const browserLogger = createBrowserLogger();
+
 const renderSemaphore = Semaphore.makeUnsafe(1);
-
-export const toErrorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message;
-  return 'The operation could not be completed.';
-};
-
-export const getSupportedDiagramType = (diagramType: string): GraphDiagramType => {
-  const normalizedType = diagramType === 'flowchart-v2' ? 'flowchart' : diagramType;
-  const isSupported = GRAPH_DIAGRAM_TYPES.includes(normalizedType as GraphDiagramType);
-  if (!isSupported) {
-    throw new GraphRenderError(
-      'unsupported',
-      `Mermaid diagram type "${diagramType}" is not supported in the React Flow view yet.`,
-      diagramType,
-    );
-  }
-  return normalizedType as GraphDiagramType;
-};
-
-const storageError = (cause: unknown) => {
-  return new Error(`Saved graphs: ${toErrorMessage(cause)}`, { cause });
-};
 
 export const loadInitialWorkspace = () =>
   Effect.tryPromise({
@@ -126,22 +106,6 @@ export const renameWorkspace = (context: AppContext) =>
     catch: storageError,
   });
 
-const createDefaultTranslationSettings = (): GraphTranslationSettings =>
-  Object.assign({}, DEFAULT_SETTINGS, {
-    nodeGradient: Object.assign({}, DEFAULT_SETTINGS.nodeGradient),
-  });
-
-const createDefaultCanvasSettings = (): GraphCanvasSettings =>
-  Object.assign({}, DEFAULT_CANVAS_SETTINGS, {
-    background: 'none' as const,
-    gradient: Object.assign({}, DEFAULT_CANVAS_SETTINGS.gradient),
-    pattern: Object.assign({}, DEFAULT_CANVAS_SETTINGS.pattern),
-    shader: Object.assign({}, DEFAULT_CANVAS_SETTINGS.shader, {
-      aurora: Object.assign({}, DEFAULT_CANVAS_SETTINGS.shader.aurora),
-      gradientMesh: Object.assign({}, DEFAULT_CANVAS_SETTINGS.shader.gradientMesh),
-    }),
-  });
-
 export const renderWorkspace = (context: AppContext) =>
   Effect.tryPromise({
     try: async () => {
@@ -174,25 +138,17 @@ export const renderWorkspace = (context: AppContext) =>
     },
   }).pipe(Effect.uninterruptible, renderSemaphore.withPermits(1));
 
-export const shouldRerenderWorkspace = (records: GraphRecords) => {
-  const translation = records.translation;
-  const isSequence = translation.diagramType === 'sequence';
-  if (!isSequence) return false;
-  const participantNodes = translation.elements.nodes.filter(
-    (node) => node.data?.kind === 'sequence-participant',
-  );
-  const hasLegacyParticipants = participantNodes.some(
-    (node) => !Array.isArray(node.data?.handles) || node.data.styleVersion !== 1,
-  );
-  const hasMessageEdges = translation.elements.edges.some(
-    (edge) => edge.data?.kind === 'sequence-message',
-  );
-  const hasActionNodes = translation.elements.nodes.some(
-    (node) => node.data?.kind === 'sequence-action',
-  );
-  const hasLegacyMessages = hasMessageEdges && !hasActionNodes;
-  const needsUpgrade = hasLegacyParticipants || hasLegacyMessages;
-  return needsUpgrade;
+export const getSupportedDiagramType = (diagramType: string): GraphDiagramType => {
+  const normalizedType = diagramType === 'flowchart-v2' ? 'flowchart' : diagramType;
+  const isSupported = GRAPH_DIAGRAM_TYPES.includes(normalizedType as GraphDiagramType);
+  if (!isSupported) {
+    throw new GraphRenderError(
+      'unsupported',
+      `Mermaid diagram type "${diagramType}" is not supported in the React Flow view yet.`,
+      diagramType,
+    );
+  }
+  return normalizedType as GraphDiagramType;
 };
 
 export const exportWorkspace = (context: AppContext) =>
@@ -208,6 +164,11 @@ export const exportWorkspace = (context: AppContext) =>
     },
     catch: (cause) => new Error(`Export: ${toErrorMessage(cause)}`, { cause }),
   });
+
+export const toErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  return 'The operation could not be completed.';
+};
 
 export const resetWorkspace = (context: AppContext, sample: GraphDiagramType = 'sequence') => {
   const workspaceId = crypto.randomUUID();
@@ -252,9 +213,25 @@ export const restoreWorkspace = (context: AppContext, records: GraphRecords) => 
   });
 };
 
-export const rememberWorkspace = (workspaces: GraphWorkspace[], workspace: GraphWorkspace) => {
-  const otherWorkspaces = workspaces.filter((item) => item.id !== workspace.id);
-  return [workspace].concat(otherWorkspaces);
+export const shouldRerenderWorkspace = (records: GraphRecords) => {
+  const translation = records.translation;
+  const isSequence = translation.diagramType === 'sequence';
+  if (!isSequence) return false;
+  const participantNodes = translation.elements.nodes.filter(
+    (node) => node.data?.kind === 'sequence-participant',
+  );
+  const hasLegacyParticipants = participantNodes.some(
+    (node) => !Array.isArray(node.data?.handles) || node.data.styleVersion !== 1,
+  );
+  const hasMessageEdges = translation.elements.edges.some(
+    (edge) => edge.data?.kind === 'sequence-message',
+  );
+  const hasActionNodes = translation.elements.nodes.some(
+    (node) => node.data?.kind === 'sequence-action',
+  );
+  const hasLegacyMessages = hasMessageEdges && !hasActionNodes;
+  const needsUpgrade = hasLegacyParticipants || hasLegacyMessages;
+  return needsUpgrade;
 };
 
 export const acceptSavedWorkspace = (context: AppContext, records: GraphRecords) => {
@@ -269,18 +246,17 @@ export const acceptSavedWorkspace = (context: AppContext, records: GraphRecords)
   return { input, translation, workspace, workspaces, versions: records.versions };
 };
 
+export const rememberWorkspace = (workspaces: GraphWorkspace[], workspace: GraphWorkspace) => {
+  const otherWorkspaces = workspaces.filter((item) => item.id !== workspace.id);
+  return [workspace].concat(otherWorkspaces);
+};
+
 export const isCurrentDraft = (context: AppContext, draft: AppContext) => {
   const sameName = context.workspace.name === draft.workspace.name;
   const sameSource = context.input.source === draft.input.source;
   const sameTranslation = context.translation === draft.translation;
   const unchanged = sameName && sameSource && sameTranslation;
   return unchanged;
-};
-
-export const updateTranslation = (context: AppContext, update: Partial<GraphTranslation>) => {
-  const updatedAt = new Date().toISOString();
-  const translation = Object.assign({}, context.translation, update, { updatedAt });
-  return { translation };
 };
 
 export const acceptRenderedElements = (context: AppContext, rendered: GraphRenderResult) => {
@@ -373,6 +349,12 @@ export const updateCanvas = (
   return updateTranslation(context, { view });
 };
 
+export const updateTranslation = (context: AppContext, update: Partial<GraphTranslation>) => {
+  const updatedAt = new Date().toISOString();
+  const translation = Object.assign({}, context.translation, update, { updatedAt });
+  return { translation };
+};
+
 export const handleReactFlowError = (code: string, message: string) => {
   if (code === '002') return;
   browserLogger.warn({ code, message }, 'react flow error');
@@ -400,3 +382,23 @@ export const getSaveLabel = (snapshot: { hasTag: (tag: string) => boolean }) => 
   if (snapshot.hasTag('saved')) return 'Saved';
   return 'Save';
 };
+
+const storageError = (cause: unknown) => {
+  return new Error(`Saved graphs: ${toErrorMessage(cause)}`, { cause });
+};
+
+const createDefaultCanvasSettings = (): GraphCanvasSettings =>
+  Object.assign({}, DEFAULT_CANVAS_SETTINGS, {
+    background: 'none' as const,
+    gradient: Object.assign({}, DEFAULT_CANVAS_SETTINGS.gradient),
+    pattern: Object.assign({}, DEFAULT_CANVAS_SETTINGS.pattern),
+    shader: Object.assign({}, DEFAULT_CANVAS_SETTINGS.shader, {
+      aurora: Object.assign({}, DEFAULT_CANVAS_SETTINGS.shader.aurora),
+      gradientMesh: Object.assign({}, DEFAULT_CANVAS_SETTINGS.shader.gradientMesh),
+    }),
+  });
+
+const createDefaultTranslationSettings = (): GraphTranslationSettings =>
+  Object.assign({}, DEFAULT_SETTINGS, {
+    nodeGradient: Object.assign({}, DEFAULT_SETTINGS.nodeGradient),
+  });

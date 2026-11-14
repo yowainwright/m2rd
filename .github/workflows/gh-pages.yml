@@ -11,15 +11,16 @@ permissions:
 concurrency:
   group: pages
   cancel-in-progress: false
-  queue: max
 
 jobs:
   revision:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
       sha: ${{ steps.revision.outputs.sha }}
       bump: ${{ steps.revision.outputs.bump }}
+      tag: ${{ steps.revision.outputs.tag }}
     steps:
       - name: Checkout release history
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -45,7 +46,8 @@ jobs:
               echo '::error::This release was superseded. Redeploy current main with manual dispatch.'
               exit 1
             fi
-            printf 'sha=%s\nbump=false\n' "$released_sha" >> "$GITHUB_OUTPUT"
+            tag=$(git show "$released_sha:package.json" | node -p '"v" + JSON.parse(require("node:fs").readFileSync(0, "utf8")).version')
+            printf 'sha=%s\nbump=false\ntag=%s\n' "$released_sha" "$tag" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           printf 'sha=%s\nbump=true\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -55,15 +57,19 @@ jobs:
     uses: ./.github/workflows/test.yml
     with:
       ref: ${{ needs.revision.outputs.sha }}
+      pages-artifact: true
+      patch-version: ${{ needs.revision.outputs.bump == 'true' }}
 
   release:
     needs: [revision, checks]
     if: needs.revision.outputs.bump == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: write
     outputs:
       sha: ${{ steps.release.outputs.sha }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - name: Checkout main
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -87,6 +93,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify install preserves tracked files
+        run: |
+          git status --short
+          git diff --exit-code
+
       - name: Create patch release
         id: release
         env:
@@ -99,55 +110,31 @@ jobs:
           pnpm exec release-it patch --ci --no-hooks --git.push \
             --git.commitMessage="$release_message" \
             --git.pushArgs=--follow-tags --git.pushArgs=--atomic
-          printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          tag="v$(node -p 'require("./package.json").version')"
+          printf 'sha=%s\ntag=%s\n' "$(git rev-parse HEAD)" "$tag" >> "$GITHUB_OUTPUT"
 
-  build:
+  publish:
     needs: [revision, checks, release]
     if: >-
       ${{ !cancelled() && needs.checks.result == 'success' &&
+          (needs.release.outputs.tag != '' || needs.revision.outputs.tag != '') &&
           (needs.release.result == 'success' || needs.release.result == 'skipped') }}
-    runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pages: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          ref: ${{ needs.release.outputs.sha || needs.revision.outputs.sha }}
-          persist-credentials: false
-
-      - name: Setup pnpm
-        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
-        with:
-          version: 12.2.1
-          cache: true
-          install: false
-          runtime: node@26
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build static site
-        run: pnpm run build
-
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Test exported site
-        run: pnpm run test:e2e
-
-      - name: Configure Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
-        with:
-          path: out
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release.outputs.tag || needs.revision.outputs.tag }}
+      checks-passed: true
+    secrets:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
   deploy:
-    needs: build
-    runs-on: ubuntu-latest
+    needs: [checks, release]
+    if: >-
+      ${{ !cancelled() && needs.checks.result == 'success' &&
+          (needs.release.result == 'success' || needs.release.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       pages: write
       id-token: write
@@ -155,6 +142,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128

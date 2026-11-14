@@ -3,6 +3,11 @@ import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/app/lib/utils';
 
+export type ButtonProps = React.ComponentProps<'button'> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+  };
+
 const buttonVariants = cva(
   [
     'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium',
@@ -28,11 +33,6 @@ const buttonVariants = cva(
     },
   },
 );
-
-export type ButtonProps = React.ComponentProps<'button'> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ asChild = false, className, size, variant, ...props }, ref) => {

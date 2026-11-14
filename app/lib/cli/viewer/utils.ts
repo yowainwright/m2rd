@@ -7,74 +7,6 @@ import type { Key } from 'ink';
 import { errorMessage, exportSvg } from '../utils';
 import type { TerminalInput, ViewerContext, ViewerEvent, ViewerProps, ViewerSize } from './types';
 
-export const viewerSize = (terminal: ViewerSize, viewport: ViewerSize = terminal) => {
-  const columns = Math.min(terminal.columns, viewport.columns);
-  const rows = Math.min(terminal.rows, viewport.rows);
-  return { columns, rows };
-};
-
-export const viewerStatusText = (context: ViewerContext) => {
-  const column = context.left + 1;
-  const row = context.top + 1;
-  const position = `${column},${row} | ${context.contentWidth}x${context.contentHeight}`;
-  const save = context.svgExport ? ' | s save SVG' : '';
-  const details = context.message ?? position;
-  const multiple = (context.navigation?.items.length ?? 0) > 1;
-  const navigation = multiple ? 'p previous | n next | ' : '';
-  return `${navigation}arrows / hjkl scroll${save} | q quit | ${details}`;
-};
-
-export const viewerTitle = ({ navigation }: ViewerContext) => {
-  if (!navigation) return undefined;
-  const label = navigation.items[navigation.index].label;
-  return `${label} · diagram ${navigation.index + 1}/${navigation.items.length}`;
-};
-
-export const currentDiagram = ({ navigation }: ViewerContext, fallback: string) => {
-  if (!navigation) return fallback;
-  return navigation.items[navigation.index].diagram;
-};
-
-export const measureDiagram = (diagram: string) => {
-  const lines = diagram.split('\n');
-  const contentWidth = Math.max(1, ...lines.map((line) => stringWidth(line)));
-  return { contentWidth, contentHeight: lines.length };
-};
-
-const clampPosition = (context: ViewerContext, x: number, y: number) => {
-  const maxLeft = Math.max(0, context.contentWidth - context.width);
-  const maxTop = Math.max(0, context.contentHeight - context.height);
-  const left = Math.max(0, Math.min(x, maxLeft));
-  const top = Math.max(0, Math.min(y, maxTop));
-  return { left, top };
-};
-
-export const viewportSize = (columns: number, rows: number, header = false) => {
-  const reservedRows = header ? 3 : 2;
-  const width = Math.max(1, columns - 1);
-  const height = Math.max(1, rows - reservedRows);
-  return { width, height };
-};
-
-export const viewerInput = (props: ViewerProps, dimensions: ViewerSize): ViewerContext => {
-  const { diagram, svgExport } = props;
-  const multiple = Array.isArray(diagram);
-  const drawing = multiple ? (diagram[0]?.diagram ?? '') : diagram;
-  const navigation = multiple ? { items: diagram, index: 0 } : undefined;
-  const size = measureDiagram(drawing);
-  const viewport = viewportSize(dimensions.columns, dimensions.rows, multiple);
-  return Object.assign({}, size, viewport, { left: 0, top: 0, svgExport, navigation });
-};
-
-const selectDiagram = (context: ViewerContext, offset: number) => {
-  const navigation = context.navigation;
-  if (!navigation) return {};
-  const index = navigation.index + offset;
-  const size = measureDiagram(navigation.items[index].diagram);
-  const selection = Object.assign({}, navigation, { index });
-  return Object.assign({}, size, { navigation: selection, left: 0, top: 0, message: undefined });
-};
-
 export const viewerSetup = setup({
   types: {
     context: {} as ViewerContext,
@@ -125,6 +57,69 @@ export const viewerSetup = setup({
   },
 });
 
+export const terminalInput = Effect.acquireRelease(
+  Effect.try({
+    try: openTerminal,
+    catch: () =>
+      'An interactive terminal is required. Run m2rd from a terminal with keyboard access.',
+  }),
+  ({ stream, owned }) =>
+    Effect.sync(() => {
+      if (owned) stream.destroy();
+    }),
+);
+
+export const viewerSize = (terminal: ViewerSize, viewport: ViewerSize = terminal) => {
+  const columns = Math.min(terminal.columns, viewport.columns);
+  const rows = Math.min(terminal.rows, viewport.rows);
+  return { columns, rows };
+};
+
+export const viewerStatusText = (context: ViewerContext) => {
+  const column = context.left + 1;
+  const row = context.top + 1;
+  const position = `${column},${row} | ${context.contentWidth}x${context.contentHeight}`;
+  const save = context.svgExport ? ' | s save SVG' : '';
+  const details = context.message ?? position;
+  const multiple = (context.navigation?.items.length ?? 0) > 1;
+  const navigation = multiple ? 'p previous | n next | ' : '';
+  return `${navigation}arrows / hjkl scroll${save} | q quit | ${details}`;
+};
+
+export const viewerTitle = ({ navigation }: ViewerContext) => {
+  if (!navigation) return undefined;
+  const label = navigation.items[navigation.index].label;
+  return `${label} · diagram ${navigation.index + 1}/${navigation.items.length}`;
+};
+
+export const currentDiagram = ({ navigation }: ViewerContext, fallback: string) => {
+  if (!navigation) return fallback;
+  return navigation.items[navigation.index].diagram;
+};
+
+export const viewerInput = (props: ViewerProps, dimensions: ViewerSize): ViewerContext => {
+  const { diagram, svgExport } = props;
+  const multiple = Array.isArray(diagram);
+  const drawing = multiple ? (diagram[0]?.diagram ?? '') : diagram;
+  const navigation = multiple ? { items: diagram, index: 0 } : undefined;
+  const size = measureDiagram(drawing);
+  const viewport = viewportSize(dimensions.columns, dimensions.rows, multiple);
+  return Object.assign({}, size, viewport, { left: 0, top: 0, svgExport, navigation });
+};
+
+export const viewportSize = (columns: number, rows: number, header = false) => {
+  const reservedRows = header ? 3 : 2;
+  const width = Math.max(1, columns - 1);
+  const height = Math.max(1, rows - reservedRows);
+  return { width, height };
+};
+
+export function measureDiagram(diagram: string) {
+  const lines = diagram.split('\n');
+  const contentWidth = Math.max(1, ...lines.map((line) => stringWidth(line)));
+  return { contentWidth, contentHeight: lines.length };
+}
+
 export const keyboardEvent = (input: string, key: Key, page: number): ViewerEvent | undefined => {
   const quit = input === 'q' || (key.ctrl && input === 'c');
   if (quit) return { type: 'quit' };
@@ -148,16 +143,24 @@ export const keyboardEvent = (input: string, key: Key, page: number): ViewerEven
   return undefined;
 };
 
-const openKeyboard = () => {
-  const fd = openSync('/dev/tty', 'r');
-  try {
-    return new ReadStream(fd);
-  } finally {
-    closeSync(fd);
-  }
-};
+function clampPosition(context: ViewerContext, x: number, y: number) {
+  const maxLeft = Math.max(0, context.contentWidth - context.width);
+  const maxTop = Math.max(0, context.contentHeight - context.height);
+  const left = Math.max(0, Math.min(x, maxLeft));
+  const top = Math.max(0, Math.min(y, maxTop));
+  return { left, top };
+}
 
-const openTerminal = (): TerminalInput => {
+function selectDiagram(context: ViewerContext, offset: number) {
+  const navigation = context.navigation;
+  if (!navigation) return {};
+  const index = navigation.index + offset;
+  const size = measureDiagram(navigation.items[index].diagram);
+  const selection = Object.assign({}, navigation, { index });
+  return Object.assign({}, size, { navigation: selection, left: 0, top: 0, message: undefined });
+}
+
+function openTerminal(): TerminalInput {
   if (!process.stdout.isTTY) throw new Error('An interactive terminal is required.');
   const owned = !process.stdin.isTTY;
   const stream = owned ? openKeyboard() : process.stdin;
@@ -170,16 +173,13 @@ const openTerminal = (): TerminalInput => {
     if (owned) stream.destroy();
     throw cause;
   }
-};
+}
 
-export const terminalInput = Effect.acquireRelease(
-  Effect.try({
-    try: openTerminal,
-    catch: () =>
-      'An interactive terminal is required. Run m2rd from a terminal with keyboard access.',
-  }),
-  ({ stream, owned }) =>
-    Effect.sync(() => {
-      if (owned) stream.destroy();
-    }),
-);
+function openKeyboard() {
+  const fd = openSync('/dev/tty', 'r');
+  try {
+    return new ReadStream(fd);
+  } finally {
+    closeSync(fd);
+  }
+}

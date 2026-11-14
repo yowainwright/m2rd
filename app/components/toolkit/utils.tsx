@@ -32,51 +32,63 @@ import type {
   ToolkitMetadataProps,
 } from './types';
 
-function MetadataField({
-  emphasized,
-  label,
-  value,
-  hideLabel,
-}: MetadataFieldsProps['fields'][number]) {
-  const text = String(value);
-  const descriptionClassName = emphasized
-    ? 'min-w-0 max-w-full flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base font-semibold leading-5 text-foreground'
-    : 'min-w-0 shrink-0 truncate text-xs leading-4 text-foreground';
-  const description = (
-    <FieldDescription className={descriptionClassName} title={emphasized ? undefined : text}>
-      {text}
-    </FieldDescription>
-  );
-  const needsTooltip = emphasized && text.length > TITLE_TOOLTIP_MAX_LENGTH;
-  const content = needsTooltip ? (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="block min-w-0 max-w-full flex-1">{description}</div>
-      </TooltipTrigger>
-      <TooltipContent>{text}</TooltipContent>
-    </Tooltip>
-  ) : (
-    description
-  );
-  const caption = hideLabel ? null : (
-    <FieldTitle className="shrink-0 text-xs font-normal text-muted-foreground">{label}</FieldTitle>
-  );
-  const fieldClassName = cn('w-auto min-w-0 max-w-full gap-1', emphasized ? 'flex-1' : 'shrink-0');
+export function ToolkitMetadata(props: ToolkitMetadataProps) {
+  const versionNumber = props.version ? `v${props.version.version}` : LABELS.unsaved;
   return (
-    <Field aria-label={label} className={fieldClassName} key={label} orientation="horizontal">
-      {caption}
-      {content}
-    </Field>
+    <TooltipProvider>
+      <FieldSet className="gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <Badge className={METADATA_BADGE_CLASS_NAME} variant="outline">
+            {versionNumber}
+          </Badge>
+          <Badge className={METADATA_BADGE_CLASS_NAME} variant="outline">
+            {props.scope}
+          </Badge>
+        </div>
+        <ToolkitDetails {...props} />
+      </FieldSet>
+    </TooltipProvider>
   );
 }
 
-function MetadataFields({ className, fields }: MetadataFieldsProps) {
-  const items = fields.map((field) => <MetadataField key={field.label} {...field} />);
-  return (
-    <FieldGroup className={cn('flex-row flex-wrap gap-x-3 gap-y-0.5', className)}>
-      {items}
-    </FieldGroup>
-  );
+export const getPatternPreviewStyle = (value: string, preview: string) => {
+  if (value === 'pattern-diagonal') return { background: preview };
+  if (value.startsWith('pattern-')) return { background: preview, backgroundSize: '8px 8px' };
+  return { background: preview };
+};
+
+export const isPatternBackground = (background: GraphCanvasSettings['background']) =>
+  background === 'grid' || background === 'dot-pattern' || background.startsWith('pattern-');
+
+export const createShaderColorHandler =
+  (
+    shader: GraphShaderSettings,
+    isAurora: boolean,
+    key: ShaderColorKey,
+    onUpdate: ShaderToolsProps['onUpdate'],
+  ) =>
+  (event: ChangeEvent<HTMLInputElement>) => {
+    onUpdate(updateShaderColor(shader, isAurora, key, event.target.value));
+  };
+
+function ToolkitDetails(props: ToolkitMetadataProps) {
+  const nodeCount = props.selectedNodeIds.length;
+  const edgeCount = props.selectedEdgeIds.length;
+  const isGlobal = nodeCount === 0 && edgeCount === 0;
+  if (isGlobal) return <GlobalMetadata {...props} />;
+  const node = props.elements.nodes.find((item) => item.id === props.selectedNodeIds[0]);
+  const edge = props.elements.edges.find((item) => item.id === props.selectedEdgeIds[0]);
+  const hasOnlyOneNode = nodeCount === 1 && edgeCount === 0;
+  const hasOnlyOneEdge = edgeCount === 1 && nodeCount === 0;
+  const isSingleNode = hasOnlyOneNode && node !== undefined;
+  const isSingleEdge = hasOnlyOneEdge && edge !== undefined;
+  if (isSingleNode) return <NodeMetadata node={node} />;
+  if (isSingleEdge) return <EdgeMetadata edge={edge} />;
+  const fields = [
+    { label: LABELS.nodes, value: nodeCount },
+    { label: LABELS.edges, value: edgeCount },
+  ];
+  return <MetadataFields fields={fields} />;
 }
 
 function GlobalMetadata({ version, workspaceName }: ToolkitMetadataProps) {
@@ -117,53 +129,52 @@ function EdgeMetadata({ edge }: EdgeMetadataProps) {
   return <MetadataFields fields={fields} />;
 }
 
-function ToolkitDetails(props: ToolkitMetadataProps) {
-  const nodeCount = props.selectedNodeIds.length;
-  const edgeCount = props.selectedEdgeIds.length;
-  const isGlobal = nodeCount === 0 && edgeCount === 0;
-  if (isGlobal) return <GlobalMetadata {...props} />;
-  const node = props.elements.nodes.find((item) => item.id === props.selectedNodeIds[0]);
-  const edge = props.elements.edges.find((item) => item.id === props.selectedEdgeIds[0]);
-  const hasOnlyOneNode = nodeCount === 1 && edgeCount === 0;
-  const hasOnlyOneEdge = edgeCount === 1 && nodeCount === 0;
-  const isSingleNode = hasOnlyOneNode && node !== undefined;
-  const isSingleEdge = hasOnlyOneEdge && edge !== undefined;
-  if (isSingleNode) return <NodeMetadata node={node} />;
-  if (isSingleEdge) return <EdgeMetadata edge={edge} />;
-  const fields = [
-    { label: LABELS.nodes, value: nodeCount },
-    { label: LABELS.edges, value: edgeCount },
-  ];
-  return <MetadataFields fields={fields} />;
-}
-
-export function ToolkitMetadata(props: ToolkitMetadataProps) {
-  const versionNumber = props.version ? `v${props.version.version}` : LABELS.unsaved;
+function MetadataFields({ className, fields }: MetadataFieldsProps) {
+  const items = fields.map((field) => <MetadataField key={field.label} {...field} />);
   return (
-    <TooltipProvider>
-      <FieldSet className="gap-1">
-        <div className="flex items-center justify-between gap-2">
-          <Badge className={METADATA_BADGE_CLASS_NAME} variant="outline">
-            {versionNumber}
-          </Badge>
-          <Badge className={METADATA_BADGE_CLASS_NAME} variant="outline">
-            {props.scope}
-          </Badge>
-        </div>
-        <ToolkitDetails {...props} />
-      </FieldSet>
-    </TooltipProvider>
+    <FieldGroup className={cn('flex-row flex-wrap gap-x-3 gap-y-0.5', className)}>
+      {items}
+    </FieldGroup>
   );
 }
 
-export const getPatternPreviewStyle = (value: string, preview: string) => {
-  if (value === 'pattern-diagonal') return { background: preview };
-  if (value.startsWith('pattern-')) return { background: preview, backgroundSize: '8px 8px' };
-  return { background: preview };
-};
-
-export const isPatternBackground = (background: GraphCanvasSettings['background']) =>
-  background === 'grid' || background === 'dot-pattern' || background.startsWith('pattern-');
+function MetadataField({
+  emphasized,
+  label,
+  value,
+  hideLabel,
+}: MetadataFieldsProps['fields'][number]) {
+  const text = String(value);
+  const descriptionClassName = emphasized
+    ? 'min-w-0 max-w-full flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base font-semibold leading-5 text-foreground'
+    : 'min-w-0 shrink-0 truncate text-xs leading-4 text-foreground';
+  const description = (
+    <FieldDescription className={descriptionClassName} title={emphasized ? undefined : text}>
+      {text}
+    </FieldDescription>
+  );
+  const needsTooltip = emphasized && text.length > TITLE_TOOLTIP_MAX_LENGTH;
+  const content = needsTooltip ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="block min-w-0 max-w-full flex-1">{description}</div>
+      </TooltipTrigger>
+      <TooltipContent>{text}</TooltipContent>
+    </Tooltip>
+  ) : (
+    description
+  );
+  const caption = hideLabel ? null : (
+    <FieldTitle className="shrink-0 text-xs font-normal text-muted-foreground">{label}</FieldTitle>
+  );
+  const fieldClassName = cn('w-auto min-w-0 max-w-full gap-1', emphasized ? 'flex-1' : 'shrink-0');
+  return (
+    <Field aria-label={label} className={fieldClassName} key={label} orientation="horizontal">
+      {caption}
+      {content}
+    </Field>
+  );
+}
 
 const updateShaderColor = (
   shader: GraphShaderSettings,
@@ -193,14 +204,3 @@ const updateShaderColor = (
     gradientMesh: Object.assign({}, shader.gradientMesh, { colorB: value }),
   });
 };
-
-export const createShaderColorHandler =
-  (
-    shader: GraphShaderSettings,
-    isAurora: boolean,
-    key: ShaderColorKey,
-    onUpdate: ShaderToolsProps['onUpdate'],
-  ) =>
-  (event: ChangeEvent<HTMLInputElement>) => {
-    onUpdate(updateShaderColor(shader, isAurora, key, event.target.value));
-  };

@@ -1,18 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-const updateSource = async (page: Page, source: string) => {
-  await page.locator('.cm-content').click();
-  await page.keyboard.press('ControlOrMeta+A');
-  await page.keyboard.insertText(source);
-};
-
-const chooseEr = async (page: Page) => {
-  await page.getByRole('button', { name: 'New', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'ER diagram', exact: true }).click();
-  await expect(page.locator('[data-er-entity]')).toHaveCount(3);
-};
-
 test('renders the ER sample with attributes, keys, and comments', async ({ page }) => {
   await page.goto('./');
   await chooseEr(page);
@@ -148,3 +136,15 @@ test('exports native ER attributes and cardinality markers', async ({ page }) =>
   expect(svg).toContain('data-er-marker="zero_or_more"');
   expect(svg).toContain('marker-end="url(#');
 });
+
+async function updateSource(page: Page, source: string) {
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.insertText(source);
+}
+
+async function chooseEr(page: Page) {
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'ER diagram', exact: true }).click();
+  await expect(page.locator('[data-er-entity]')).toHaveCount(3);
+}

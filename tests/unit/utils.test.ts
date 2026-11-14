@@ -26,21 +26,6 @@ const sequenceSvg = `<svg viewBox="0 0 450 306">
   <g data-et="note" data-id="n0"><rect class="note" x="300" y="100" width="100" height="40" /><text class="noteText">Note</text></g>
 </svg>`;
 
-const createElements = () => parseMermaidSvg(sequenceSvg, DEFAULT_SETTINGS, 'sequence');
-
-const createTranslation = (elements: GraphElements) =>
-  Object.assign({}, APP_INITIAL_CONTEXT.translation, {
-    diagramType: 'sequence' as const,
-    elements,
-  });
-
-const createRecords = (elements: GraphElements) => ({
-  input: APP_INITIAL_CONTEXT.input,
-  translation: createTranslation(elements),
-  versions: [],
-  workspace: APP_INITIAL_CONTEXT.workspace,
-});
-
 test('allows Gantt selection and measurements while rejecting schedule mutations', () => {
   const task = { id: 'task', data: { kind: 'gantt-task' }, position: { x: 50, y: 20 } };
   const frame = { id: 'frame', data: { kind: 'gantt-frame' }, position: { x: 0, y: 0 } };
@@ -202,3 +187,23 @@ describe('saved sequence upgrades', () => {
     });
   });
 });
+
+function createElements() {
+  return parseMermaidSvg(sequenceSvg, DEFAULT_SETTINGS, 'sequence');
+}
+
+function createRecords(elements: GraphElements) {
+  return {
+    input: APP_INITIAL_CONTEXT.input,
+    translation: createTranslation(elements),
+    versions: [],
+    workspace: APP_INITIAL_CONTEXT.workspace,
+  };
+}
+
+function createTranslation(elements: GraphElements) {
+  return Object.assign({}, APP_INITIAL_CONTEXT.translation, {
+    diagramType: 'sequence' as const,
+    elements,
+  });
+}

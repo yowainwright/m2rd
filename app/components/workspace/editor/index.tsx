@@ -9,24 +9,6 @@ import { ErrorIndicator, WorkspacePanelToggle } from '../utils';
 
 const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false });
 
-function MermaidEditorHeader({
-  isFocused,
-  onToggleCollapse,
-}: {
-  isFocused: boolean;
-  onToggleCollapse: () => void;
-}) {
-  return (
-    <CardHeader className="flex-row items-center justify-between space-y-0">
-      <CardTitle className="text-sm">Mermaid input</CardTitle>
-      <div className="flex items-center gap-1">
-        <ErrorIndicator />
-        <WorkspacePanelToggle isFocused={isFocused} panel="mermaid" onToggle={onToggleCollapse} />
-      </div>
-    </CardHeader>
-  );
-}
-
 export function MermaidEditor({
   isCollapsed,
   isFocused,
@@ -58,5 +40,23 @@ export function MermaidEditor({
         />
       </CardContent>
     </Card>
+  );
+}
+
+function MermaidEditorHeader({
+  isFocused,
+  onToggleCollapse,
+}: {
+  isFocused: boolean;
+  onToggleCollapse: () => void;
+}) {
+  return (
+    <CardHeader className="flex-row items-center justify-between space-y-0">
+      <CardTitle className="text-sm">Mermaid input</CardTitle>
+      <div className="flex items-center gap-1">
+        <ErrorIndicator />
+        <WorkspacePanelToggle isFocused={isFocused} panel="mermaid" onToggle={onToggleCollapse} />
+      </div>
+    </CardHeader>
   );
 }

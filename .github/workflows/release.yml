@@ -1,6 +1,19 @@
 name: Release
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Exact tag to publish after validation
+        type: string
+        required: true
+      checks-passed:
+        description: Caller has already completed the reusable test workflow
+        type: boolean
+        default: false
+    secrets:
+      HOMEBREW_TAP_TOKEN:
+        required: false
   push:
     tags: ['v*']
 
@@ -9,22 +22,28 @@ permissions:
 
 jobs:
   test:
+    if: ${{ !inputs.checks-passed }}
     uses: ./.github/workflows/test.yml
     with:
-      ref: ${{ github.ref }}
+      ref: refs/tags/${{ inputs.tag || github.ref_name }}
 
   release:
     needs: test
+    if: >-
+      ${{ !cancelled() && (needs.test.result == 'success' ||
+          (inputs.checks-passed && needs.test.result == 'skipped')) }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write
     env:
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
           persist-credentials: false
 
       - name: Setup pnpm
@@ -45,13 +64,23 @@ jobs:
         run: pnpm run cli:pack
 
       - name: Create GitHub release
-        run: gh release create "$TAG" "tmp/m2rd-${TAG#v}.tgz" --title "$TAG" --generate-notes --verify-tag
+        run: |
+          set -euo pipefail
+          ASSET="m2rd-${TAG#v}.tgz"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release view "$TAG" --json assets |
+              jq -e --arg name "$ASSET" '.assets | any(.name == $name)'
+            exit 0
+          fi
+          gh release create "$TAG" "tmp/$ASSET" --title "$TAG" --generate-notes --verify-tag
 
   tap:
     needs: release
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     env:
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout Homebrew tap
@@ -85,9 +114,9 @@ jobs:
             brews/m2rd.json
           base: main
           branch: m2rd
-          commit-message: 'm2rd ${{ github.ref_name }}'
-          title: 'm2rd ${{ github.ref_name }}'
+          commit-message: 'm2rd ${{ inputs.tag || github.ref_name }}'
+          title: 'm2rd ${{ inputs.tag || github.ref_name }}'
           body: |
             Update m2rd.
 
-            Release: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+            Release: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.tag || github.ref_name }}

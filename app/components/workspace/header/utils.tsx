@@ -62,6 +62,29 @@ export function WorkspaceTitle({ children }: WorkspaceTitleProps) {
   );
 }
 
+export function ExportMenu({ canExport, onExport }: ExportMenuProps) {
+  return (
+    <DropdownMenu>
+      <ExportMenuTrigger canExport={canExport} />
+      <DropdownMenuContent align="end" className="min-w-0">
+        <DropdownMenuItem className="text-xs" onSelect={() => onExport('svg', 'forever')}>
+          SVG
+        </DropdownMenuItem>
+        <DropdownMenuItem className="text-xs" onSelect={() => onExport('png', 'forever')}>
+          PNG
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-xs" onSelect={() => onExport('gif', 'forever')}>
+          GIF loop
+        </DropdownMenuItem>
+        <DropdownMenuItem className="text-xs" onSelect={() => onExport('gif', 'once')}>
+          GIF once
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function getTitleHandlers({ actor, restoreFocus }: TitleInteraction) {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing) return;
@@ -144,29 +167,6 @@ function WorkspaceTitleEditor(props: WorkspaceTitleEditorProps) {
         </p>
       )}
     </div>
-  );
-}
-
-export function ExportMenu({ canExport, onExport }: ExportMenuProps) {
-  return (
-    <DropdownMenu>
-      <ExportMenuTrigger canExport={canExport} />
-      <DropdownMenuContent align="end" className="min-w-0">
-        <DropdownMenuItem className="text-xs" onSelect={() => onExport('svg', 'forever')}>
-          SVG
-        </DropdownMenuItem>
-        <DropdownMenuItem className="text-xs" onSelect={() => onExport('png', 'forever')}>
-          PNG
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-xs" onSelect={() => onExport('gif', 'forever')}>
-          GIF loop
-        </DropdownMenuItem>
-        <DropdownMenuItem className="text-xs" onSelect={() => onExport('gif', 'once')}>
-          GIF once
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 

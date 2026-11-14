@@ -29,19 +29,7 @@ import {
   updateTranslation,
 } from '@/app/utils';
 
-export const getActorInput = ({ context }: { context: AppMachineContext }) => context;
-export const getActorOutput = <Value>({ event }: { event: { output: Value } }) => event.output;
-export const getActorError = ({ event }: { event: { error: unknown } }) => event.error;
-
 const MAX_VIEWPORT_HISTORY = 5;
-const isSameViewport = (current: Viewport | undefined, next: Viewport) => {
-  if (!current) return false;
-  const sameX = current.x === next.x;
-  const sameY = current.y === next.y;
-  const sameZoom = current.zoom === next.zoom;
-  const samePosition = sameX && sameY;
-  return samePosition && sameZoom;
-};
 
 const actorSetup = setup({
   types: {} as { context: AppMachineContext; events: AppEvent },
@@ -345,3 +333,18 @@ export const appSetup = titleSetup.extend({
     }),
   },
 });
+
+export const getActorInput = ({ context }: { context: AppMachineContext }) => context;
+
+export const getActorOutput = <Value>({ event }: { event: { output: Value } }) => event.output;
+
+export const getActorError = ({ event }: { event: { error: unknown } }) => event.error;
+
+function isSameViewport(current: Viewport | undefined, next: Viewport) {
+  if (!current) return false;
+  const sameX = current.x === next.x;
+  const sameY = current.y === next.y;
+  const sameZoom = current.zoom === next.zoom;
+  const samePosition = sameX && sameY;
+  return samePosition && sameZoom;
+}
