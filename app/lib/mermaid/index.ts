@@ -9,17 +9,6 @@ const REMOVED_SOURCE = [
   /^\s+/g,
 ];
 
-const removeSource = (source: string, offsets: number[], pattern: RegExp) => {
-  const matches = Array.from(source.matchAll(pattern));
-  const removed = new Set(
-    matches.flatMap((match) =>
-      Array.from({ length: match[0].length }, (_, index) => match.index + index),
-    ),
-  );
-  const remaining = offsets.filter((_, index) => !removed.has(index));
-  return { source: source.replace(pattern, ''), offsets: remaining };
-};
-
 export const getMermaidErrorLine = (source: string, error: string) =>
   Effect.sync(() => {
     const reported = error.match(/^(?:Mermaid: )?(?:Parse|Lexical) error on line (\d+)/i);
@@ -51,3 +40,14 @@ export const getMermaidDiagnostics = (doc: EditorView['state']['doc'], error: st
     const diagnostic: Diagnostic = { from, to: line.to, severity: 'error', message };
     return [diagnostic];
   });
+
+const removeSource = (source: string, offsets: number[], pattern: RegExp) => {
+  const matches = Array.from(source.matchAll(pattern));
+  const removed = new Set(
+    matches.flatMap((match) =>
+      Array.from({ length: match[0].length }, (_, index) => match.index + index),
+    ),
+  );
+  const remaining = offsets.filter((_, index) => !removed.has(index));
+  return { source: source.replace(pattern, ''), offsets: remaining };
+};

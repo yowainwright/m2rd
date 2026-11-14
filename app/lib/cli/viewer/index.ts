@@ -24,45 +24,35 @@ import type {
   ViewerSvgExport,
 } from './types';
 
-const viewerContents = (diagram: string, context: ViewerContext) => {
-  const { width, height, contentWidth, contentHeight, left: scrollLeft, top: scrollTop } = context;
-  const text = createElement(Text, null, diagram);
-  const props = {
-    width,
-    height,
-    contentWidth,
-    contentHeight,
-    scrollLeft,
-    scrollTop,
-    children: text,
-  };
-  return createElement(ScrollView, props);
-};
-
-const viewerStatus = (context: ViewerContext) => {
-  const label = viewerStatusText(context);
-  return createElement(Text, { dimColor: true, wrap: 'truncate-end' }, label);
-};
-
-const viewerScreen = (diagram: string, context: ViewerContext, size: ViewerSize) => {
-  const { columns, rows } = size;
-  const minimumRows = context.navigation ? 4 : 3;
-  const small = columns < 2 || rows < minimumRows;
-  const contents = small
-    ? createElement(Text, { wrap: 'truncate-end' }, 'Resize terminal; q quits')
-    : viewerContents(diagram, context);
-  const status = small ? null : viewerStatus(context);
-  const title = viewerTitle(context);
-  const showHeading = title && !small;
-  const heading = showHeading ? createElement(Text, { wrap: 'truncate-end' }, title) : null;
-  return createElement(
-    Box,
-    { width: columns, height: rows, flexDirection: 'column', overflow: 'hidden' },
-    heading,
-    contents,
-    status,
+export const showViewer = (
+  diagram: string | ViewerDiagram[],
+  ascii: boolean,
+  viewport?: ViewerSize,
+  svgExport?: ViewerSvgExport,
+) =>
+  Effect.scoped(
+    terminalInput.pipe(
+      Effect.flatMap(({ stream }) =>
+        Effect.tryPromise({
+          try: async () => {
+            const tree = createElement(Viewer, { diagram, ascii, viewport, svgExport });
+            const app = render(tree, {
+              stdin: stream,
+              alternateScreen: true,
+              interactive: true,
+              exitOnCtrlC: false,
+            });
+            try {
+              await app.waitUntilExit();
+            } finally {
+              app.unmount();
+            }
+          },
+          catch: errorMessage,
+        }),
+      ),
+    ),
   );
-};
 
 const Viewer = ({ diagram, ascii, viewport, svgExport }: ViewerProps) => {
   const terminal = useWindowSize();
@@ -93,32 +83,42 @@ const Viewer = ({ diagram, ascii, viewport, svgExport }: ViewerProps) => {
   return createElement(UnicodeContext.Provider, { value }, screen);
 };
 
-export const showViewer = (
-  diagram: string | ViewerDiagram[],
-  ascii: boolean,
-  viewport?: ViewerSize,
-  svgExport?: ViewerSvgExport,
-) =>
-  Effect.scoped(
-    terminalInput.pipe(
-      Effect.flatMap(({ stream }) =>
-        Effect.tryPromise({
-          try: async () => {
-            const tree = createElement(Viewer, { diagram, ascii, viewport, svgExport });
-            const app = render(tree, {
-              stdin: stream,
-              alternateScreen: true,
-              interactive: true,
-              exitOnCtrlC: false,
-            });
-            try {
-              await app.waitUntilExit();
-            } finally {
-              app.unmount();
-            }
-          },
-          catch: errorMessage,
-        }),
-      ),
-    ),
+const viewerScreen = (diagram: string, context: ViewerContext, size: ViewerSize) => {
+  const { columns, rows } = size;
+  const minimumRows = context.navigation ? 4 : 3;
+  const small = columns < 2 || rows < minimumRows;
+  const contents = small
+    ? createElement(Text, { wrap: 'truncate-end' }, 'Resize terminal; q quits')
+    : viewerContents(diagram, context);
+  const status = small ? null : viewerStatus(context);
+  const title = viewerTitle(context);
+  const showHeading = title && !small;
+  const heading = showHeading ? createElement(Text, { wrap: 'truncate-end' }, title) : null;
+  return createElement(
+    Box,
+    { width: columns, height: rows, flexDirection: 'column', overflow: 'hidden' },
+    heading,
+    contents,
+    status,
   );
+};
+
+const viewerStatus = (context: ViewerContext) => {
+  const label = viewerStatusText(context);
+  return createElement(Text, { dimColor: true, wrap: 'truncate-end' }, label);
+};
+
+const viewerContents = (diagram: string, context: ViewerContext) => {
+  const { width, height, contentWidth, contentHeight, left: scrollLeft, top: scrollTop } = context;
+  const text = createElement(Text, null, diagram);
+  const props = {
+    width,
+    height,
+    contentWidth,
+    contentHeight,
+    scrollLeft,
+    scrollTop,
+    children: text,
+  };
+  return createElement(ScrollView, props);
+};

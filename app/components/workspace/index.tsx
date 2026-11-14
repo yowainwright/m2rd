@@ -18,23 +18,26 @@ import { WorkspaceSidebar } from './sidebar';
 import type { WorkspacePanelsProps } from './types';
 import { WorkspaceErrors } from './utils';
 
-const COLLAPSED_PANEL_SIZE = 0;
-
-const createPanelResizeHandler =
-  (send: (event: AppEvent) => void, panel: 'mermaid' | 'react-flow') =>
-  (size: PanelSize, _id: string | number | undefined, previousSize: PanelSize | undefined) => {
-    if (!previousSize) return;
-    const wasCollapsed = previousSize.inPixels <= COLLAPSED_PANEL_SIZE;
-    const isCollapsed = size.inPixels <= COLLAPSED_PANEL_SIZE;
-    if (wasCollapsed === isCollapsed) return;
-    send({ type: 'layout.panel.update', panel, collapsed: isCollapsed });
-  };
-
-const togglePanel = (panel: ReturnType<typeof usePanelRef>['current'], isCollapsed: boolean) => {
-  if (!panel) return;
-  if (isCollapsed) panel.expand();
-  else panel.collapse();
+type WorkspacePanelGroupProps = WorkspacePanelsProps & {
+  controls: ReturnType<typeof useWorkspacePanelControls>;
 };
+
+type WorkspacePanelLayoutProps = WorkspacePanelGroupProps & {
+  isFocusMode: boolean;
+  onMermaidResize: PanelProps['onResize'];
+  onReactFlowResize: PanelProps['onResize'];
+};
+
+type WorkspacePaneProps = {
+  minSize: string;
+  onResize: PanelProps['onResize'];
+  panelRef: ReturnType<typeof usePanelRef>;
+  isCollapsed: boolean;
+  isSiblingHidden: boolean;
+  onToggleCollapse: () => void;
+};
+
+const COLLAPSED_PANEL_SIZE = 0;
 
 export function Workspace() {
   const { send } = AppContext.useActorRef();
@@ -65,6 +68,25 @@ export function Workspace() {
   );
 }
 
+function togglePanel(panel: ReturnType<typeof usePanelRef>['current'], isCollapsed: boolean) {
+  if (!panel) return;
+  if (isCollapsed) panel.expand();
+  else panel.collapse();
+}
+
+function WorkspacePanels(props: WorkspacePanelsProps) {
+  const controls = useWorkspacePanelControls();
+  const sectionClassName = cn(
+    'h-[70rem] shrink-0 p-4 lg:h-auto lg:min-h-0 lg:flex-1',
+    !props.isLayoutReady && 'invisible',
+  );
+  return (
+    <section className={sectionClassName}>
+      <WorkspacePanelGroup {...props} controls={controls} />
+    </section>
+  );
+}
+
 function useWorkspacePanelControls() {
   const { send } = AppContext.useActorRef();
   const mermaidPanelCollapsed = AppContext.useSelector(
@@ -90,38 +112,6 @@ function useWorkspacePanelControls() {
   };
 }
 
-type WorkspacePanelGroupProps = WorkspacePanelsProps & {
-  controls: ReturnType<typeof useWorkspacePanelControls>;
-};
-
-type WorkspacePanelLayoutProps = WorkspacePanelGroupProps & {
-  isFocusMode: boolean;
-  onMermaidResize: PanelProps['onResize'];
-  onReactFlowResize: PanelProps['onResize'];
-};
-
-type WorkspacePaneProps = {
-  minSize: string;
-  onResize: PanelProps['onResize'];
-  panelRef: ReturnType<typeof usePanelRef>;
-  isCollapsed: boolean;
-  isSiblingHidden: boolean;
-  onToggleCollapse: () => void;
-};
-
-function WorkspacePanels(props: WorkspacePanelsProps) {
-  const controls = useWorkspacePanelControls();
-  const sectionClassName = cn(
-    'h-[70rem] shrink-0 p-4 lg:h-auto lg:min-h-0 lg:flex-1',
-    !props.isLayoutReady && 'invisible',
-  );
-  return (
-    <section className={sectionClassName}>
-      <WorkspacePanelGroup {...props} controls={controls} />
-    </section>
-  );
-}
-
 function WorkspacePanelGroup(props: WorkspacePanelGroupProps) {
   const { controls } = props;
   const isFocusMode = controls.mermaidPanelCollapsed || controls.reactFlowPanelCollapsed;
@@ -136,6 +126,16 @@ function WorkspacePanelGroup(props: WorkspacePanelGroupProps) {
     />
   );
 }
+
+const createPanelResizeHandler =
+  (send: (event: AppEvent) => void, panel: 'mermaid' | 'react-flow') =>
+  (size: PanelSize, _id: string | number | undefined, previousSize: PanelSize | undefined) => {
+    if (!previousSize) return;
+    const wasCollapsed = previousSize.inPixels <= COLLAPSED_PANEL_SIZE;
+    const isCollapsed = size.inPixels <= COLLAPSED_PANEL_SIZE;
+    if (wasCollapsed === isCollapsed) return;
+    send({ type: 'layout.panel.update', panel, collapsed: isCollapsed });
+  };
 
 function WorkspacePanelLayout(props: WorkspacePanelLayoutProps) {
   return (

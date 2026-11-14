@@ -22,6 +22,69 @@ import { showViewer } from './viewer';
 import { svgTheme } from './themes/mermaid/constants';
 import type { CliDiagram, CliOptions, RenderedMermaid } from './types';
 
+export const errorMessage = (cause: unknown): string => {
+  if (cause instanceof Error) return cleanText(cause.message);
+  return cleanText(String(cause));
+};
+
+export const readInput = (path?: string, allowEmpty = false) => {
+  const inputRequired = !path && process.stdin.isTTY;
+  if (inputRequired)
+    return Effect.fail('Input required. Pipe Mermaid or Markdown text, or provide a file.');
+  const read = path ? () => readFile(path, 'utf8') : readStdin;
+  return Effect.tryPromise({ try: read, catch: errorMessage }).pipe(
+    Effect.filterOrFail(
+      (value) => allowEmpty || value.trim().length > 0,
+      () => 'Input is empty. Provide Mermaid text.',
+    ),
+  );
+};
+
+export const renderDiagram = (source: string, options: CliOptions) =>
+  renderMermaid(source).pipe(
+    Effect.flatMap((diagram) => {
+      if (diagram.family === 'sequence') return renderSequence(diagram, options);
+      if (diagram.family === 'state') return renderState(diagram, options);
+      return renderFlowchart(diagram, options);
+    }),
+  );
+
+export const renderMermaid = (source: string) =>
+  Effect.tryPromise({ try: () => renderMermaidSource(source), catch: errorMessage });
+
+export const exportSvg = (source: string, output: string) =>
+  Effect.tryPromise({ try: () => renderSvgSource(source), catch: errorMessage }).pipe(
+    Effect.flatMap((svg) =>
+      Effect.tryPromise({
+        try: () => writeFile(output, svg, { encoding: 'utf8', flag: 'wx' }),
+        catch: errorMessage,
+      }),
+    ),
+  );
+
+export const runCli = (paths: string | string[] | undefined, options: CliOptions) =>
+  readDiagrams(paths).pipe(Effect.flatMap((diagrams) => presentDiagrams(diagrams, options)));
+
+export const readDiagrams = (input: string | string[] | undefined) => {
+  const paths = Array.isArray(input) ? input : [input];
+  const inputs = paths.length > 0 ? paths : [undefined];
+  return Effect.forEach(inputs, readDocument, { concurrency: 1 }).pipe(
+    Effect.map((documents) => documents.flat()),
+    Effect.filterOrFail(
+      (diagrams) => diagrams.length > 0,
+      () => 'No Mermaid diagrams found. Add a fenced mermaid block or pipe Mermaid text.',
+    ),
+  );
+};
+
+export const formatError = (message: string) => {
+  const width = Math.max(MIN_WIDTH, Math.min(process.stderr.columns || DEFAULT_WIDTH, MAX_WIDTH));
+  const title = createElement(Text, { bold: true, color: 'red' }, 'm2rd');
+  const text = createElement(Text, null, cleanText(message));
+  const panel = createElement(Panel, { borderColor: 'red', width }, title, text);
+  return renderToString(panel, { columns: width });
+};
+
 export const cleanText = (value: string) => {
   const lines = stripVTControlCharacters(value).split('\n');
   return lines
@@ -30,31 +93,33 @@ export const cleanText = (value: string) => {
     .trim();
 };
 
-export const errorMessage = (cause: unknown): string => {
-  if (cause instanceof Error) return cleanText(cause.message);
-  return cleanText(String(cause));
+const renderMermaidSource = async (source: string): Promise<RenderedMermaid> => {
+  const sanitizingWindow = initializeMermaid();
+  try {
+    const parsed = await mermaid.parse(source);
+    if (parsed.diagramType === 'stateDiagram') return await renderStateSource(source);
+    const flowchart = parsed.diagramType.startsWith('flowchart');
+    const supported = flowchart || parsed.diagramType === 'sequence';
+    if (!supported) throw new Error(`The CLI preview does not support ${parsed.diagramType} yet.`);
+    const family = flowchart ? 'flowchart' : 'sequence';
+    const data = await readDiagramData(source, family);
+    const rendered = await mermaid.render(MERMAID_RENDER_ID, source);
+    const svg = new JSDOM(rendered.svg, { contentType: 'image/svg+xml' }).window.document;
+    return { family, svg, data };
+  } finally {
+    sanitizingWindow.close();
+  }
 };
 
-const initializeMermaid = (config: MermaidConfig = {}) => {
-  const sanitizingWindow = new JSDOM('').window;
-  Object.assign(createDOMPurify, createDOMPurify(sanitizingWindow));
-  const window = createHTMLWindow();
-  Object.assign(window, { Error, Math, Array, Function, CSS: sanitizingWindow.CSS });
-  Object.assign(globalThis, {
-    window,
-    document: window.document,
-    CSSStyleSheet: sanitizingWindow.CSSStyleSheet,
-  });
-  mermaid.initialize(
-    Object.assign({}, config, {
-      startOnLoad: false,
-      securityLevel: 'strict',
-      htmlLabels: false,
-      flowchart: { htmlLabels: false },
-      suppressErrorRendering: true,
-    }),
-  );
-  return sanitizingWindow;
+const readDiagramData = async (source: string, family: RenderedMermaid['family']) => {
+  const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
+  if (family === 'sequence') {
+    validateSequenceData(diagram.db);
+    return undefined;
+  }
+  const getData = 'getData' in diagram.db ? diagram.db.getData : undefined;
+  if (typeof getData !== 'function') throw new Error('Mermaid did not expose diagram data.');
+  return getData.call(diagram.db) as unknown;
 };
 
 const validateSequenceData = (db: object) => {
@@ -71,17 +136,6 @@ const validateSequenceData = (db: object) => {
     throw new Error(
       'Sequence participant groups and creation/destruction are not supported in this preview yet.',
     );
-};
-
-const readDiagramData = async (source: string, family: RenderedMermaid['family']) => {
-  const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
-  if (family === 'sequence') {
-    validateSequenceData(diagram.db);
-    return undefined;
-  }
-  const getData = 'getData' in diagram.db ? diagram.db.getData : undefined;
-  if (typeof getData !== 'function') throw new Error('Mermaid did not expose diagram data.');
-  return getData.call(diagram.db) as unknown;
 };
 
 const renderStateSource = async (source: string): Promise<RenderedMermaid> => {
@@ -104,26 +158,16 @@ const renderStateSource = async (source: string): Promise<RenderedMermaid> => {
   }
 };
 
-const renderMermaidSource = async (source: string): Promise<RenderedMermaid> => {
-  const sanitizingWindow = initializeMermaid();
+const renderSvgSource = async (source: string) => {
+  const sanitizingWindow = initializeMermaid(svgTheme);
   try {
-    const parsed = await mermaid.parse(source);
-    if (parsed.diagramType === 'stateDiagram') return await renderStateSource(source);
-    const flowchart = parsed.diagramType.startsWith('flowchart');
-    const supported = flowchart || parsed.diagramType === 'sequence';
-    if (!supported) throw new Error(`The CLI preview does not support ${parsed.diagramType} yet.`);
-    const family = flowchart ? 'flowchart' : 'sequence';
-    const data = await readDiagramData(source, family);
-    const rendered = await mermaid.render(MERMAID_RENDER_ID, source);
-    const svg = new JSDOM(rendered.svg, { contentType: 'image/svg+xml' }).window.document;
-    return { family, svg, data };
+    enableParentElement();
+    const rendered = await mermaid.render('m2rd-image', source);
+    return rendered.svg;
   } finally {
     sanitizingWindow.close();
   }
 };
-
-export const renderMermaid = (source: string) =>
-  Effect.tryPromise({ try: () => renderMermaidSource(source), catch: errorMessage });
 
 const enableParentElement = () => {
   const NodeConstructor: typeof Node = Reflect.get(window, 'Node');
@@ -139,44 +183,32 @@ const enableParentElement = () => {
   });
 };
 
-const renderSvgSource = async (source: string) => {
-  const sanitizingWindow = initializeMermaid(svgTheme);
-  try {
-    enableParentElement();
-    const rendered = await mermaid.render('m2rd-image', source);
-    return rendered.svg;
-  } finally {
-    sanitizingWindow.close();
-  }
-};
-
-export const exportSvg = (source: string, output: string) =>
-  Effect.tryPromise({ try: () => renderSvgSource(source), catch: errorMessage }).pipe(
-    Effect.flatMap((svg) =>
-      Effect.tryPromise({
-        try: () => writeFile(output, svg, { encoding: 'utf8', flag: 'wx' }),
-        catch: errorMessage,
-      }),
-    ),
+const initializeMermaid = (config: MermaidConfig = {}) => {
+  const sanitizingWindow = new JSDOM('').window;
+  Object.assign(createDOMPurify, createDOMPurify(sanitizingWindow));
+  const window = createHTMLWindow();
+  Object.assign(window, { Error, Math, Array, Function, Map, CSS: sanitizingWindow.CSS });
+  Object.assign(globalThis, {
+    window,
+    document: window.document,
+    CSSStyleSheet: sanitizingWindow.CSSStyleSheet,
+  });
+  mermaid.initialize(
+    Object.assign({}, config, {
+      startOnLoad: false,
+      securityLevel: 'strict',
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
+      suppressErrorRendering: true,
+    }),
   );
+  return sanitizingWindow;
+};
 
 const readStdin = async () => {
   process.stdin.setEncoding('utf8');
   const chunks = await process.stdin.toArray();
   return chunks.join('');
-};
-
-export const readInput = (path?: string, allowEmpty = false) => {
-  const inputRequired = !path && process.stdin.isTTY;
-  if (inputRequired)
-    return Effect.fail('Input required. Pipe Mermaid or Markdown text, or provide a file.');
-  const read = path ? () => readFile(path, 'utf8') : readStdin;
-  return Effect.tryPromise({ try: read, catch: errorMessage }).pipe(
-    Effect.filterOrFail(
-      (value) => allowEmpty || value.trim().length > 0,
-      () => 'Input is empty. Provide Mermaid text.',
-    ),
-  );
 };
 
 const tokenDiagrams = (token: Token): string[] => {
@@ -189,9 +221,12 @@ const tokenDiagrams = (token: Token): string[] => {
   return [token.text];
 };
 
-const mermaidBlocks = (tokens: Token[]): string[] => tokens.flatMap(tokenDiagrams);
-
-const isMarkdown = (path = '') => /\.(md|markdown)$/i.test(extname(path));
+const readDocument = (path?: string) =>
+  readInput(path, isMarkdown(path)).pipe(
+    Effect.flatMap((source) =>
+      Effect.try({ try: () => extractDiagrams(source, path), catch: errorMessage }),
+    ),
+  );
 
 const extractDiagrams = (source: string, path?: string): CliDiagram[] => {
   const blocks = mermaidBlocks(Lexer.lex(source));
@@ -201,33 +236,20 @@ const extractDiagrams = (source: string, path?: string): CliDiagram[] => {
   return sources.map((source) => ({ source, label }));
 };
 
-const readDocument = (path?: string) =>
-  readInput(path, isMarkdown(path)).pipe(
-    Effect.flatMap((source) =>
-      Effect.try({ try: () => extractDiagrams(source, path), catch: errorMessage }),
-    ),
-  );
+const mermaidBlocks = (tokens: Token[]): string[] => tokens.flatMap(tokenDiagrams);
 
-export const readDiagrams = (input: string | string[] | undefined) => {
-  const paths = Array.isArray(input) ? input : [input];
-  const inputs = paths.length > 0 ? paths : [undefined];
-  return Effect.forEach(inputs, readDocument, { concurrency: 1 }).pipe(
-    Effect.map((documents) => documents.flat()),
-    Effect.filterOrFail(
-      (diagrams) => diagrams.length > 0,
-      () => 'No Mermaid diagrams found. Add a fenced mermaid block or pipe Mermaid text.',
-    ),
-  );
+const isMarkdown = (path = '') => /\.(md|markdown)$/i.test(extname(path));
+
+const presentDiagrams = (diagrams: CliDiagram[], options: CliOptions) => {
+  if (options.output) {
+    if (diagrams.length !== 1)
+      return Effect.fail('--output requires exactly one diagram. Provide a single Mermaid block.');
+    return exportSvg(diagrams[0].source, options.output);
+  }
+  return Effect.forEach(diagrams, (diagram) => renderDocumentDiagram(diagram, options), {
+    concurrency: 1,
+  }).pipe(Effect.flatMap((rendered) => presentRenderedDiagrams(rendered, options.ascii)));
 };
-
-export const renderDiagram = (source: string, options: CliOptions) =>
-  renderMermaid(source).pipe(
-    Effect.flatMap((diagram) => {
-      if (diagram.family === 'sequence') return renderSequence(diagram, options);
-      if (diagram.family === 'state') return renderState(diagram, options);
-      return renderFlowchart(diagram, options);
-    }),
-  );
 
 const renderDocumentDiagram = ({ source, label }: CliDiagram, options: CliOptions) =>
   renderDiagram(source, options).pipe(
@@ -251,26 +273,4 @@ const presentRenderedDiagrams = (
     return { diagram, label };
   });
   return showViewer(views, ascii);
-};
-
-const presentDiagrams = (diagrams: CliDiagram[], options: CliOptions) => {
-  if (options.output) {
-    if (diagrams.length !== 1)
-      return Effect.fail('--output requires exactly one diagram. Provide a single Mermaid block.');
-    return exportSvg(diagrams[0].source, options.output);
-  }
-  return Effect.forEach(diagrams, (diagram) => renderDocumentDiagram(diagram, options), {
-    concurrency: 1,
-  }).pipe(Effect.flatMap((rendered) => presentRenderedDiagrams(rendered, options.ascii)));
-};
-
-export const runCli = (paths: string | string[] | undefined, options: CliOptions) =>
-  readDiagrams(paths).pipe(Effect.flatMap((diagrams) => presentDiagrams(diagrams, options)));
-
-export const formatError = (message: string) => {
-  const width = Math.max(MIN_WIDTH, Math.min(process.stderr.columns || DEFAULT_WIDTH, MAX_WIDTH));
-  const title = createElement(Text, { bold: true, color: 'red' }, 'm2rd');
-  const text = createElement(Text, null, cleanText(message));
-  const panel = createElement(Panel, { borderColor: 'red', width }, title, text);
-  return renderToString(panel, { columns: width });
 };

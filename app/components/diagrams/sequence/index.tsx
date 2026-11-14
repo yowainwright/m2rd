@@ -20,60 +20,7 @@ import type {
 } from '@/app/graph/types';
 import { getFrameStyle, getHeaderStyle, getMessagePath } from './utils';
 
-function ParticipantActivations({ data }: Pick<NodeProps<SequenceParticipantData>, 'data'>) {
-  const activationStyle = {
-    backgroundColor: data.style.backgroundColor,
-    borderColor: data.style.borderColor,
-  };
-  return (data.activations || []).map((activation, index) => (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute z-0 border border-gray-400 bg-gray-100"
-      key={`${activation.x}-${activation.y}-${index}`}
-      style={Object.assign({}, activationStyle, {
-        height: activation.height,
-        left: activation.x,
-        top: activation.y,
-        width: activation.width,
-      })}
-    />
-  ));
-}
-
-function ParticipantHandles({ data }: Pick<NodeProps<SequenceParticipantData>, 'data'>) {
-  const handleStyle = SEQUENCE_HANDLE_STYLE;
-  const rightHandleStyle = SEQUENCE_RIGHT_HANDLE_STYLE;
-  return (data.handles || []).flatMap((handle) => [
-    <Handle
-      id={`${handle.id}-source-left`}
-      key={`${handle.id}-source-left`}
-      position={Position.Left}
-      style={Object.assign({}, handleStyle, { top: handle.sourceY })}
-      type="source"
-    />,
-    <Handle
-      id={`${handle.id}-source-right`}
-      key={`${handle.id}-source-right`}
-      position={Position.Right}
-      style={Object.assign({}, rightHandleStyle, { top: handle.sourceY })}
-      type="source"
-    />,
-    <Handle
-      id={`${handle.id}-target-left`}
-      key={`${handle.id}-target-left`}
-      position={Position.Left}
-      style={Object.assign({}, handleStyle, { top: handle.targetY })}
-      type="target"
-    />,
-    <Handle
-      id={`${handle.id}-target-right`}
-      key={`${handle.id}-target-right`}
-      position={Position.Right}
-      style={Object.assign({}, rightHandleStyle, { top: handle.targetY })}
-      type="target"
-    />,
-  ]);
-}
+const actionHandleStyle = SEQUENCE_HANDLE_STYLE;
 
 export function SequenceParticipantNode({ data, id }: NodeProps<SequenceParticipantData>) {
   const updateNodeInternals = useUpdateNodeInternals();
@@ -121,29 +68,6 @@ export function SequenceMessageEdge(props: EdgeProps<SequenceMessageData>) {
     </>
   );
 }
-
-function MessageSequenceNumber({
-  data,
-  sourceX,
-  sourceY,
-}: Pick<EdgeProps<SequenceMessageData>, 'data' | 'sourceX' | 'sourceY'>) {
-  const showSequenceNumber = data?.segment === 'source' && Boolean(data.sequenceNumber);
-  if (!showSequenceNumber) return null;
-  return (
-    <EdgeLabelRenderer>
-      <div
-        className="nodrag nopan pointer-events-none absolute"
-        style={{ transform: `translate(-50%, -50%) translate(${sourceX}px, ${sourceY}px)` }}
-      >
-        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-gray-700 px-1 text-xs font-semibold text-white">
-          {data.sequenceNumber}
-        </span>
-      </div>
-    </EdgeLabelRenderer>
-  );
-}
-
-const actionHandleStyle = SEQUENCE_HANDLE_STYLE;
 
 export function SequenceActionNode({ data }: NodeProps<SequenceActionData>) {
   const title = [data.sequenceNumber, data.label].filter(Boolean).join(' ');
@@ -214,5 +138,81 @@ export function SequenceFrameNode({ data }: NodeProps<SequenceFrameData>) {
       {condition}
       {sections}
     </div>
+  );
+}
+
+function ParticipantActivations({ data }: Pick<NodeProps<SequenceParticipantData>, 'data'>) {
+  const activationStyle = {
+    backgroundColor: data.style.backgroundColor,
+    borderColor: data.style.borderColor,
+  };
+  return (data.activations || []).map((activation, index) => (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute z-0 border border-gray-400 bg-gray-100"
+      key={`${activation.x}-${activation.y}-${index}`}
+      style={Object.assign({}, activationStyle, {
+        height: activation.height,
+        left: activation.x,
+        top: activation.y,
+        width: activation.width,
+      })}
+    />
+  ));
+}
+
+function ParticipantHandles({ data }: Pick<NodeProps<SequenceParticipantData>, 'data'>) {
+  const handleStyle = SEQUENCE_HANDLE_STYLE;
+  const rightHandleStyle = SEQUENCE_RIGHT_HANDLE_STYLE;
+  return (data.handles || []).flatMap((handle) => [
+    <Handle
+      id={`${handle.id}-source-left`}
+      key={`${handle.id}-source-left`}
+      position={Position.Left}
+      style={Object.assign({}, handleStyle, { top: handle.sourceY })}
+      type="source"
+    />,
+    <Handle
+      id={`${handle.id}-source-right`}
+      key={`${handle.id}-source-right`}
+      position={Position.Right}
+      style={Object.assign({}, rightHandleStyle, { top: handle.sourceY })}
+      type="source"
+    />,
+    <Handle
+      id={`${handle.id}-target-left`}
+      key={`${handle.id}-target-left`}
+      position={Position.Left}
+      style={Object.assign({}, handleStyle, { top: handle.targetY })}
+      type="target"
+    />,
+    <Handle
+      id={`${handle.id}-target-right`}
+      key={`${handle.id}-target-right`}
+      position={Position.Right}
+      style={Object.assign({}, rightHandleStyle, { top: handle.targetY })}
+      type="target"
+    />,
+  ]);
+}
+
+function MessageSequenceNumber({
+  data,
+  sourceX,
+  sourceY,
+}: Pick<EdgeProps<SequenceMessageData>, 'data' | 'sourceX' | 'sourceY'>) {
+  const showSequenceNumber = data?.segment === 'source' && Boolean(data.sequenceNumber);
+  if (!showSequenceNumber) return null;
+  return (
+    <EdgeLabelRenderer>
+      <div
+        className="nodrag nopan pointer-events-none absolute"
+        style={{ transform: `translate(-50%, -50%) translate(${sourceX}px, ${sourceY}px)` }}
+      >
+        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-gray-700 px-1 text-xs font-semibold text-white">
+          {data.sequenceNumber}
+        </span>
+      </div>
+    </EdgeLabelRenderer>
   );
 }

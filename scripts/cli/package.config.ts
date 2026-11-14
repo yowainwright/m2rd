@@ -8,15 +8,6 @@ const production = replacePlugin(
   { delimiters: ['', ''], preventAssignment: true },
 );
 
-const outputOptions = (dir: string): OutputOptions => ({
-  dir,
-  format: 'esm',
-  minify: true,
-  comments: { legal: true },
-  entryFileNames: '[name].mjs',
-  chunkFileNames: '[name]-[hash].mjs',
-});
-
 export const packageConfig = (
   directory: string,
   runtimeAssets: Plugin,
@@ -35,3 +26,12 @@ export const packageConfig = (
     output,
   };
 };
+
+const outputOptions = (dir: string): OutputOptions => ({
+  dir,
+  format: 'esm',
+  minify: true,
+  comments: { legal: true },
+  entryFileNames: '[name].mjs',
+  chunkFileNames: '[name]-[hash].mjs',
+});

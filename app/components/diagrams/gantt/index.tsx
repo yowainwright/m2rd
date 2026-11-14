@@ -6,6 +6,30 @@ import { Card } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
 import type { GanttNodeData, GanttPart } from '@/app/graph/gantt/types';
 
+export function GanttDiagramNode({ data }: NodeProps<GanttNodeData>) {
+  const frame = data.kind === 'gantt-frame';
+  const overflow = frame ? 'hidden' : 'visible';
+  const style: CSSProperties = { overflow };
+  const title = [data.label, data.status, data.start, data.end].filter(Boolean).join(' · ');
+  const parts = data.parts.map((part, index) => {
+    const style = frame ? part.style : getPartStyle(part, data.style);
+    return <GanttPartView key={index} part={part} style={style} />;
+  });
+  return (
+    <Card
+      className="relative h-full w-full rounded-none border-0 bg-transparent p-0 shadow-none"
+      style={style}
+      data-gantt-kind={data.kind}
+      data-gantt-task={frame ? undefined : data.label}
+      data-gantt-status={data.status}
+      title={frame ? undefined : title}
+      aria-label={title}
+    >
+      {parts}
+    </Card>
+  );
+}
+
 const getPartStyle = (part: GanttPart, overrides: CSSProperties): CSSProperties => {
   if (part.kind === 'text') {
     const color = overrides.color ?? part.style.color;
@@ -41,28 +65,4 @@ function GanttPartView({ part, style }: { part: GanttPart; style: CSSProperties 
   const vertical = Number(style.height) > Number(style.width);
   const orientation = vertical ? 'vertical' : 'horizontal';
   return <Separator orientation={orientation} style={style} />;
-}
-
-export function GanttDiagramNode({ data }: NodeProps<GanttNodeData>) {
-  const frame = data.kind === 'gantt-frame';
-  const overflow = frame ? 'hidden' : 'visible';
-  const style: CSSProperties = { overflow };
-  const title = [data.label, data.status, data.start, data.end].filter(Boolean).join(' · ');
-  const parts = data.parts.map((part, index) => {
-    const style = frame ? part.style : getPartStyle(part, data.style);
-    return <GanttPartView key={index} part={part} style={style} />;
-  });
-  return (
-    <Card
-      className="relative h-full w-full rounded-none border-0 bg-transparent p-0 shadow-none"
-      style={style}
-      data-gantt-kind={data.kind}
-      data-gantt-task={frame ? undefined : data.label}
-      data-gantt-status={data.status}
-      title={frame ? undefined : title}
-      aria-label={title}
-    >
-      {parts}
-    </Card>
-  );
 }

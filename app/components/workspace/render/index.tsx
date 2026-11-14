@@ -24,37 +24,90 @@ import { RENDER_LABELS } from './constants';
 import type { PreviewProps } from './types';
 import { WorkspacePanelToggle } from '../utils';
 
-function useToolkitMetadata({ selection, translation }: PreviewProps) {
-  const versions = AppContext.useSelector((state) => state.context.versions);
-  const workspace = AppContext.useSelector((state) => state.context.workspace);
-  const inputId = AppContext.useSelector((state) => state.context.input.id);
-  const activeVersion = versions.find((version) => version.id === inputId);
-  const workspaceLabel = getWorkspaceLabel(workspace);
-  return {
-    elements: translation.elements,
-    scope: selection.toolkitScope,
-    selectedEdgeIds: selection.selectedEdgeIds,
-    selectedNodeIds: selection.selectedNodeIds,
-    version: activeVersion,
-    workspaceName: workspaceLabel,
-  };
+type PreviewHeaderProps = {
+  props: PreviewProps;
+  isFocused: boolean;
+  onToggleCollapse: () => void;
+};
+
+type GraphPreviewProps = {
+  isCollapsed: boolean;
+  isFocused: boolean;
+  onToggleCollapse: () => void;
+};
+
+export function GraphPreview(props: GraphPreviewProps) {
+  const canvasRevision = AppContext.useSelector((state) => state.context.canvasRevision);
+  return (
+    <ReactFlowProvider key={canvasRevision}>
+      <GraphPreviewContent {...props} />
+    </ReactFlowProvider>
+  );
 }
 
-function PreviewCanvasTools({ actions, canvas }: PreviewProps) {
+function GraphPreviewContent({ isCollapsed, isFocused, onToggleCollapse }: GraphPreviewProps) {
+  const { send } = AppContext.useActorRef();
+  const translation = AppContext.useSelector((state) => state.context.translation);
+  const canvas = Object.assign({}, DEFAULT_CANVAS_SETTINGS, translation.view.canvas);
+  const selection = getPreviewSelection(translation.elements);
+  const actions = createRenderActions(send);
+  const props = { actions, canvas, selection, translation };
   return (
-    <CanvasTools
-      gradient={canvas.gradient}
-      onBackgroundUpdate={actions.handleBackground}
-      onGradientUpdate={actions.handleGradient}
-      onGridUpdate={actions.handleGrid}
-      onLockUpdate={actions.handleLock}
-      onPatternUpdate={actions.handlePattern}
-      onShaderUpdate={actions.handleShader}
-      onSnapUpdate={actions.handleSnap}
-      pattern={canvas.pattern}
-      shader={canvas.shader}
-      settings={canvas}
-    />
+    <Card className={cn('flex h-full min-h-0 flex-col overflow-hidden', isCollapsed && 'hidden')}>
+      <PreviewHeader isFocused={isFocused} onToggleCollapse={onToggleCollapse} props={props} />
+      <CardContent className="min-h-0 flex-1 p-0">
+        <PreviewCanvas {...props} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function PreviewHeader({ props, isFocused, onToggleCollapse }: PreviewHeaderProps) {
+  const canReset = AppContext.useSelector((state) => state.can({ type: 'layout.reset' }));
+  return (
+    <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+      <CardTitle className="text-sm">{RENDER_LABELS.output}</CardTitle>
+      <PreviewHeaderActions
+        canReset={canReset}
+        isFocused={isFocused}
+        onToggleCollapse={onToggleCollapse}
+        props={props}
+      />
+    </CardHeader>
+  );
+}
+
+function PreviewHeaderActions({
+  props,
+  canReset,
+  isFocused,
+  onToggleCollapse,
+}: PreviewHeaderProps & { canReset: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <ViewportButtons actions={props.actions} />
+      <RecenterButton />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex shrink-0">
+            <Button
+              aria-label={RENDER_LABELS.resetLayout}
+              className="h-8 w-8"
+              disabled={!canReset}
+              onClick={props.actions.handleLayout}
+              size="icon"
+              type="button"
+              variant="outline"
+            >
+              <RotateCcw aria-hidden="true" className="size-4" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{RENDER_LABELS.resetLayout}</TooltipContent>
+      </Tooltip>
+      <PreviewToolkit {...props} />
+      <WorkspacePanelToggle isFocused={isFocused} panel="react-flow" onToggle={onToggleCollapse} />
+    </div>
   );
 }
 
@@ -80,6 +133,55 @@ function PreviewToolkit(props: PreviewProps) {
       onOpenChange={actions.handleToolkit}
       open={toolkitOpen}
     />
+  );
+}
+
+function PreviewCanvasTools({ actions, canvas }: PreviewProps) {
+  return (
+    <CanvasTools
+      gradient={canvas.gradient}
+      onBackgroundUpdate={actions.handleBackground}
+      onGradientUpdate={actions.handleGradient}
+      onGridUpdate={actions.handleGrid}
+      onLockUpdate={actions.handleLock}
+      onPatternUpdate={actions.handlePattern}
+      onShaderUpdate={actions.handleShader}
+      onSnapUpdate={actions.handleSnap}
+      pattern={canvas.pattern}
+      shader={canvas.shader}
+      settings={canvas}
+    />
+  );
+}
+
+function useToolkitMetadata({ selection, translation }: PreviewProps) {
+  const versions = AppContext.useSelector((state) => state.context.versions);
+  const workspace = AppContext.useSelector((state) => state.context.workspace);
+  const inputId = AppContext.useSelector((state) => state.context.input.id);
+  const activeVersion = versions.find((version) => version.id === inputId);
+  const workspaceLabel = getWorkspaceLabel(workspace);
+  return {
+    elements: translation.elements,
+    scope: selection.toolkitScope,
+    selectedEdgeIds: selection.selectedEdgeIds,
+    selectedNodeIds: selection.selectedNodeIds,
+    version: activeVersion,
+    workspaceName: workspaceLabel,
+  };
+}
+
+function ViewportButtons({ actions }: Pick<PreviewProps, 'actions'>) {
+  const hasNavigationHistory = AppContext.useSelector(({ context }) => {
+    const hasBackHistory = context.viewportHistory.length > 0;
+    const hasForwardHistory = context.viewportForwardHistory.length > 0;
+    return hasBackHistory || hasForwardHistory;
+  });
+  if (!hasNavigationHistory) return null;
+  return (
+    <>
+      <BackViewportButton actions={actions} />
+      <ForwardViewportButton actions={actions} />
+    </>
   );
 }
 
@@ -147,21 +249,6 @@ function ForwardViewportButton({ actions }: Pick<PreviewProps, 'actions'>) {
   );
 }
 
-function ViewportButtons({ actions }: Pick<PreviewProps, 'actions'>) {
-  const hasNavigationHistory = AppContext.useSelector(({ context }) => {
-    const hasBackHistory = context.viewportHistory.length > 0;
-    const hasForwardHistory = context.viewportForwardHistory.length > 0;
-    return hasBackHistory || hasForwardHistory;
-  });
-  if (!hasNavigationHistory) return null;
-  return (
-    <>
-      <BackViewportButton actions={actions} />
-      <ForwardViewportButton actions={actions} />
-    </>
-  );
-}
-
 function RecenterButton() {
   const { fitView } = useReactFlow();
   const handleRecenter = () => void fitView();
@@ -183,61 +270,6 @@ function RecenterButton() {
       </TooltipTrigger>
       <TooltipContent>{RENDER_LABELS.recenter}</TooltipContent>
     </Tooltip>
-  );
-}
-
-type PreviewHeaderProps = {
-  props: PreviewProps;
-  isFocused: boolean;
-  onToggleCollapse: () => void;
-};
-
-function PreviewHeaderActions({
-  props,
-  canReset,
-  isFocused,
-  onToggleCollapse,
-}: PreviewHeaderProps & { canReset: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      <ViewportButtons actions={props.actions} />
-      <RecenterButton />
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex shrink-0">
-            <Button
-              aria-label={RENDER_LABELS.resetLayout}
-              className="h-8 w-8"
-              disabled={!canReset}
-              onClick={props.actions.handleLayout}
-              size="icon"
-              type="button"
-              variant="outline"
-            >
-              <RotateCcw aria-hidden="true" className="size-4" />
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{RENDER_LABELS.resetLayout}</TooltipContent>
-      </Tooltip>
-      <PreviewToolkit {...props} />
-      <WorkspacePanelToggle isFocused={isFocused} panel="react-flow" onToggle={onToggleCollapse} />
-    </div>
-  );
-}
-
-function PreviewHeader({ props, isFocused, onToggleCollapse }: PreviewHeaderProps) {
-  const canReset = AppContext.useSelector((state) => state.can({ type: 'layout.reset' }));
-  return (
-    <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-      <CardTitle className="text-sm">{RENDER_LABELS.output}</CardTitle>
-      <PreviewHeaderActions
-        canReset={canReset}
-        isFocused={isFocused}
-        onToggleCollapse={onToggleCollapse}
-        props={props}
-      />
-    </CardHeader>
   );
 }
 
@@ -266,37 +298,5 @@ function PreviewCanvas({ actions, canvas, selection, translation }: PreviewProps
       shouldFitView={shouldFitView}
       snapToGrid={canvas.snapToGrid}
     />
-  );
-}
-
-type GraphPreviewProps = {
-  isCollapsed: boolean;
-  isFocused: boolean;
-  onToggleCollapse: () => void;
-};
-
-function GraphPreviewContent({ isCollapsed, isFocused, onToggleCollapse }: GraphPreviewProps) {
-  const { send } = AppContext.useActorRef();
-  const translation = AppContext.useSelector((state) => state.context.translation);
-  const canvas = Object.assign({}, DEFAULT_CANVAS_SETTINGS, translation.view.canvas);
-  const selection = getPreviewSelection(translation.elements);
-  const actions = createRenderActions(send);
-  const props = { actions, canvas, selection, translation };
-  return (
-    <Card className={cn('flex h-full min-h-0 flex-col overflow-hidden', isCollapsed && 'hidden')}>
-      <PreviewHeader isFocused={isFocused} onToggleCollapse={onToggleCollapse} props={props} />
-      <CardContent className="min-h-0 flex-1 p-0">
-        <PreviewCanvas {...props} />
-      </CardContent>
-    </Card>
-  );
-}
-
-export function GraphPreview(props: GraphPreviewProps) {
-  const canvasRevision = AppContext.useSelector((state) => state.context.canvasRevision);
-  return (
-    <ReactFlowProvider key={canvasRevision}>
-      <GraphPreviewContent {...props} />
-    </ReactFlowProvider>
   );
 }

@@ -32,14 +32,6 @@ const sequenceSvg = `<svg viewBox="0 0 450 306">
   <g data-et="note" data-id="n0"><rect class="note" x="300" y="100" width="100" height="40" /><text class="noteText">Note</text></g>
 </svg>`;
 
-const createElements = () => parseMermaidSvg(sequenceSvg, DEFAULT_SETTINGS, 'sequence');
-
-const createTranslation = (elements: GraphElements) =>
-  Object.assign({}, APP_INITIAL_CONTEXT.translation, {
-    diagramType: 'sequence' as const,
-    elements,
-  });
-
 const ganttNode = {
   id: 'gantt:build',
   type: 'ganttTask',
@@ -216,62 +208,6 @@ const sequenceAppearanceCases = {
     },
 };
 
-const expectSelectedMarker = (edgeMarker: 'none' | 'arrow' | 'arrowclosed') => {
-  const svg = sequenceSvg.replace('marker-end=', 'marker-start="url(#arrowhead)" marker-end=');
-  const original = parseMermaidSvg(svg, DEFAULT_SETTINGS, 'sequence');
-  const edited = updateSelectedEdges(original, ['message-i0-source'], { edgeMarker });
-  const recolored = updateSelectedEdges(edited, ['message-i0-source'], {
-    edgeColor: '#123456',
-  });
-  const [source, target] = recolored.edges;
-
-  expect(getEdgeMarkerValue(source, DEFAULT_SETTINGS)).toBe(edgeMarker);
-  expect(source.markerEnd).toBeUndefined();
-  expect(target).toEqual(original.edges[1]);
-  if (edgeMarker === 'none') {
-    expect(source.markerStart).toBeUndefined();
-    return;
-  }
-  expect(source.markerStart).toEqual({ type: edgeMarker, color: '#123456' });
-};
-
-const expectSequenceRoleDefaults = (id: string, fill: string, border: string, surface: string) => {
-  const node = createElements().nodes.find((item) => item.id === id);
-
-  expect(node).toBeDefined();
-  expect(node?.data.style).toEqual({});
-  expect(node?.data.styleVersion).toBe(1);
-  expect(getNodeFillValue(node, DEFAULT_SETTINGS)).toBe(fill);
-  expect(getNodeBorderValue(node, DEFAULT_SETTINGS)).toBe(border);
-  expect(getNodeSurfaceValue(node, DEFAULT_SETTINGS)).toBe(surface);
-  expect(getNodeTextValue(node, DEFAULT_SETTINGS)).toBe('#111827');
-};
-
-const expectExplicitSequenceColor = (primaryColor: string) => {
-  const edited = updateSelectedNodes(createElements(), ['A'], { primaryColor });
-  const hydrated = getTranslation(createTranslation(edited));
-  const restored = applySavedAppearance(createElements(), hydrated.elements);
-  const node = restored.nodes.find((item) => item.id === 'A');
-
-  expect(node?.data.style.backgroundColor).toBe(primaryColor);
-  expect(node?.data.styleVersion).toBe(1);
-  expect(getNodeFillValue(node, DEFAULT_SETTINGS)).toBe(primaryColor);
-};
-
-const expectSequenceStyleReset = (resetLayout: boolean) => {
-  const fresh = createElements();
-  const edited = updateSelectedNodes(fresh, ['A'], { primaryColor: '#123456' });
-  const moved = edited.nodes.map((node) =>
-    Object.assign({}, node, { position: { x: 999, y: 999 } }),
-  );
-  const restored = applySavedAppearance(fresh, { nodes: moved, edges: edited.edges }, resetLayout);
-  const participant = restored.nodes.find((node) => node.id === 'A');
-  const expectedPosition = resetLayout ? { x: 0, y: 0 } : { x: 999, y: 999 };
-
-  expect(participant?.position).toEqual(expectedPosition);
-  expect(participant?.data.style.backgroundColor).toBe('#123456');
-};
-
 describe('sequence appearance', () => {
   test.each(['none', 'arrow', 'arrowclosed'] as const)(
     'updates the selected start marker to %s and reports it in the toolkit',
@@ -297,3 +233,70 @@ describe('sequence appearance', () => {
   );
   Object.entries(sequenceAppearanceCases).forEach(([name, run]) => test(name, run));
 });
+
+function expectSelectedMarker(edgeMarker: 'none' | 'arrow' | 'arrowclosed') {
+  const svg = sequenceSvg.replace('marker-end=', 'marker-start="url(#arrowhead)" marker-end=');
+  const original = parseMermaidSvg(svg, DEFAULT_SETTINGS, 'sequence');
+  const edited = updateSelectedEdges(original, ['message-i0-source'], { edgeMarker });
+  const recolored = updateSelectedEdges(edited, ['message-i0-source'], {
+    edgeColor: '#123456',
+  });
+  const [source, target] = recolored.edges;
+
+  expect(getEdgeMarkerValue(source, DEFAULT_SETTINGS)).toBe(edgeMarker);
+  expect(source.markerEnd).toBeUndefined();
+  expect(target).toEqual(original.edges[1]);
+  if (edgeMarker === 'none') {
+    expect(source.markerStart).toBeUndefined();
+    return;
+  }
+  expect(source.markerStart).toEqual({ type: edgeMarker, color: '#123456' });
+}
+
+function expectSequenceRoleDefaults(id: string, fill: string, border: string, surface: string) {
+  const node = createElements().nodes.find((item) => item.id === id);
+
+  expect(node).toBeDefined();
+  expect(node?.data.style).toEqual({});
+  expect(node?.data.styleVersion).toBe(1);
+  expect(getNodeFillValue(node, DEFAULT_SETTINGS)).toBe(fill);
+  expect(getNodeBorderValue(node, DEFAULT_SETTINGS)).toBe(border);
+  expect(getNodeSurfaceValue(node, DEFAULT_SETTINGS)).toBe(surface);
+  expect(getNodeTextValue(node, DEFAULT_SETTINGS)).toBe('#111827');
+}
+
+function expectExplicitSequenceColor(primaryColor: string) {
+  const edited = updateSelectedNodes(createElements(), ['A'], { primaryColor });
+  const hydrated = getTranslation(createTranslation(edited));
+  const restored = applySavedAppearance(createElements(), hydrated.elements);
+  const node = restored.nodes.find((item) => item.id === 'A');
+
+  expect(node?.data.style.backgroundColor).toBe(primaryColor);
+  expect(node?.data.styleVersion).toBe(1);
+  expect(getNodeFillValue(node, DEFAULT_SETTINGS)).toBe(primaryColor);
+}
+
+function createTranslation(elements: GraphElements) {
+  return Object.assign({}, APP_INITIAL_CONTEXT.translation, {
+    diagramType: 'sequence' as const,
+    elements,
+  });
+}
+
+function expectSequenceStyleReset(resetLayout: boolean) {
+  const fresh = createElements();
+  const edited = updateSelectedNodes(fresh, ['A'], { primaryColor: '#123456' });
+  const moved = edited.nodes.map((node) =>
+    Object.assign({}, node, { position: { x: 999, y: 999 } }),
+  );
+  const restored = applySavedAppearance(fresh, { nodes: moved, edges: edited.edges }, resetLayout);
+  const participant = restored.nodes.find((node) => node.id === 'A');
+  const expectedPosition = resetLayout ? { x: 0, y: 0 } : { x: 999, y: 999 };
+
+  expect(participant?.position).toEqual(expectedPosition);
+  expect(participant?.data.style.backgroundColor).toBe('#123456');
+}
+
+function createElements() {
+  return parseMermaidSvg(sequenceSvg, DEFAULT_SETTINGS, 'sequence');
+}

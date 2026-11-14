@@ -91,60 +91,6 @@ const input = {
   },
 } satisfies CreateGraphRecordsInput;
 
-const deleteWorkspaces = async () => {
-  const workspaces = await graphRepository.list();
-  const workspaceIds = workspaces.map((workspace) => workspace.id);
-  const deletions = workspaceIds.map((workspaceId) => graphRepository.delete(workspaceId));
-  await Promise.allSettled(deletions);
-};
-
-const saveVersion = (workspaceId: string, source: string) => {
-  return graphRepository.update({
-    input: { source },
-    translation: input.translation,
-    workspace: { id: workspaceId, name: 'Versioned graph' },
-  });
-};
-
-const createFiveVersions = async () => {
-  const records = await graphRepository.create(input);
-  const id = records.workspace.id;
-  await saveVersion(id, 'version 2');
-  await saveVersion(id, 'version 3');
-  await saveVersion(id, 'version 4');
-  await saveVersion(id, 'version 5');
-  return records;
-};
-
-const startTitleEditor = async () => {
-  const saved = await graphRepository.create(input);
-  const { result } = renderHook(() => AppContext.useActorRef(), {
-    wrapper: ({ children }) => createElement(AppContext.Provider, null, children),
-  });
-  const actor = result.current;
-  await waitFor(() => expect(actor.getSnapshot().context.workspace.id).toBe(saved.workspace.id));
-  act(() => actor.send({ type: 'title.edit' }));
-  return { actor, saved };
-};
-
-const createWorkspaceControls = () => {
-  const rendered: GraphRenderResult = {
-    diagramType: 'flowchart',
-    elements: input.translation.elements,
-  };
-  const renderGraph = fromPromise<GraphRenderResult, AppMachineContext>(() =>
-    Promise.resolve(rendered),
-  );
-  const logic = appMachine.provide({ actors: { render: renderGraph } });
-  const children = createElement(
-    SidebarProvider,
-    null,
-    createElement(WorkspaceHeader),
-    createElement(WorkspaceSidebar),
-  );
-  return createElement(AppContext.Provider, { logic, children });
-};
-
 const task = {
   id: 'gantt:build',
   type: 'ganttTask',
@@ -168,18 +114,22 @@ const task = {
 const updatedNodeStyle = Object.assign({}, node.style, {
   backgroundColor: '#ef4444',
 });
+
 const updatedNode = Object.assign({}, node, {
   position: { x: 120, y: 160 },
   style: updatedNodeStyle,
 }) satisfies Node;
+
 const updatedEdgeStyle = Object.assign({}, edge.style, {
   stroke: '#22c55e',
   strokeWidth: 4,
 });
+
 const updatedEdge = Object.assign({}, edge, {
   animated: true,
   style: updatedEdgeStyle,
 }) satisfies Edge;
+
 const updatedSettings = Object.assign({}, settings, {
   edgeColor: '#22c55e',
   edgeWidth: 4,
@@ -554,6 +504,7 @@ const sequenceSvg = `<svg viewBox="0 0 450 306">
     <text class="sequenceNumber">2</text>
     <path data-et="message" data-id="i1" class="messageLine0" d="M 76,165 C 136,155 136,195 76,185" marker-end="url(#arrowhead)" />
   </svg>`;
+
 const sequenceDiagramsCases = {
   'translates participants and message actions with row-level lifeline handles': () => {
     const elements = parseMermaidSvg(sequenceSvg, settings, 'sequence');
@@ -738,3 +689,57 @@ describe('sequence diagrams', () => {
   );
   Object.entries(sequenceDiagramsCases).forEach(([name, run]) => it(name, run));
 });
+
+async function deleteWorkspaces() {
+  const workspaces = await graphRepository.list();
+  const workspaceIds = workspaces.map((workspace) => workspace.id);
+  const deletions = workspaceIds.map((workspaceId) => graphRepository.delete(workspaceId));
+  await Promise.allSettled(deletions);
+}
+
+async function createFiveVersions() {
+  const records = await graphRepository.create(input);
+  const id = records.workspace.id;
+  await saveVersion(id, 'version 2');
+  await saveVersion(id, 'version 3');
+  await saveVersion(id, 'version 4');
+  await saveVersion(id, 'version 5');
+  return records;
+}
+
+function saveVersion(workspaceId: string, source: string) {
+  return graphRepository.update({
+    input: { source },
+    translation: input.translation,
+    workspace: { id: workspaceId, name: 'Versioned graph' },
+  });
+}
+
+async function startTitleEditor() {
+  const saved = await graphRepository.create(input);
+  const { result } = renderHook(() => AppContext.useActorRef(), {
+    wrapper: ({ children }) => createElement(AppContext.Provider, null, children),
+  });
+  const actor = result.current;
+  await waitFor(() => expect(actor.getSnapshot().context.workspace.id).toBe(saved.workspace.id));
+  act(() => actor.send({ type: 'title.edit' }));
+  return { actor, saved };
+}
+
+function createWorkspaceControls() {
+  const rendered: GraphRenderResult = {
+    diagramType: 'flowchart',
+    elements: input.translation.elements,
+  };
+  const renderGraph = fromPromise<GraphRenderResult, AppMachineContext>(() =>
+    Promise.resolve(rendered),
+  );
+  const logic = appMachine.provide({ actors: { render: renderGraph } });
+  const children = createElement(
+    SidebarProvider,
+    null,
+    createElement(WorkspaceHeader),
+    createElement(WorkspaceSidebar),
+  );
+  return createElement(AppContext.Provider, { logic, children });
+}

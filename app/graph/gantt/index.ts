@@ -24,32 +24,53 @@ import {
   requireGanttGraphic,
 } from './utils';
 
-const createGanttNode = (
+export const renderGanttDiagram = async (
   id: string,
-  graphics: GanttGraphic[],
-  data: GanttNodeData,
-  frame: GanttBounds = combineGanttBounds(graphics.map(({ bounds }) => bounds)),
-): Node<GanttNodeData> => {
-  const parts = positionGanttParts(graphics, frame);
-  const position = { x: frame.x, y: frame.y };
-  const style = { width: frame.width, height: frame.height };
-  const selectable = data.kind === 'gantt-task';
-  const type = selectable ? GANTT_TASK_TYPE : GANTT_FRAME_TYPE;
-  const zIndex = selectable ? 1 : -1;
-  const content = Object.assign({}, data, { parts });
-  return {
-    id,
-    data: content,
-    position,
-    style,
-    type,
-    zIndex,
-    selectable,
-    draggable: false,
-    connectable: false,
-    deletable: false,
-    focusable: selectable,
+  source: string,
+  settings: TranslationSettings,
+) => {
+  const host = createLayoutHost(id, settings.fontFamily);
+  host.style.width = `${GANTT_LAYOUT_WIDTH}px`;
+  try {
+    const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
+    const db = diagram.db;
+    const getTasks = 'getTasks' in db ? db.getTasks : undefined;
+    const getDisplayMode = 'getDisplayMode' in db ? db.getDisplayMode : undefined;
+    const missingGetter = typeof getTasks !== 'function' || typeof getDisplayMode !== 'function';
+    if (missingGetter) throw ganttCompatibilityError();
+    const config = mermaid.mermaidAPI.getConfig();
+    const compact =
+      getDisplayMode.call(db) === 'compact' || config.gantt?.displayMode === 'compact';
+    const unsupported = compact || config.look === 'handDrawn';
+    if (unsupported) throw ganttCompatibilityError();
+    const tasks = readGanttTasks(getTasks.call(db));
+    host.replaceChildren();
+    host.innerHTML = (await mermaid.render(id, source, host)).svg;
+    const svg = host.querySelector('svg');
+    if (!svg) throw ganttCompatibilityError();
+    return createGanttElements(svg, id, tasks, settings);
+  } finally {
+    host.remove();
+  }
+};
+
+export const createGanttElements = (
+  svg: SVGSVGElement,
+  renderId: string,
+  tasks: readonly GanttTask[],
+  settings: TranslationSettings,
+): GraphElements => {
+  if (svg.querySelector('foreignObject, image')) throw ganttCompatibilityError();
+  const groups = EffectArray.groupBy(tasks, ganttTaskKey);
+  const createGroup = ([key, entries]: [string, readonly GanttTask[]]) => {
+    const ambiguous = entries.length > 1;
+    return entries.map((task, ordinal) => {
+      const id = `gantt:${encodeURIComponent(JSON.stringify([key, ordinal]))}`;
+      return createGanttTask({ svg, renderId, task, id, ambiguousIdentity: ambiguous, settings });
+    });
   };
+  const nodes = Object.entries(groups).flatMap(createGroup);
+  return { nodes: [createGanttFrame(svg)].concat(nodes), edges: [] };
 };
 
 const createGanttTask = ({
@@ -113,51 +134,30 @@ const createGanttFrame = (svg: SVGSVGElement) => {
   return createGanttNode('gantt:frame', graphics, data, frame);
 };
 
-export const createGanttElements = (
-  svg: SVGSVGElement,
-  renderId: string,
-  tasks: readonly GanttTask[],
-  settings: TranslationSettings,
-): GraphElements => {
-  if (svg.querySelector('foreignObject, image')) throw ganttCompatibilityError();
-  const groups = EffectArray.groupBy(tasks, ganttTaskKey);
-  const createGroup = ([key, entries]: [string, readonly GanttTask[]]) => {
-    const ambiguous = entries.length > 1;
-    return entries.map((task, ordinal) => {
-      const id = `gantt:${encodeURIComponent(JSON.stringify([key, ordinal]))}`;
-      return createGanttTask({ svg, renderId, task, id, ambiguousIdentity: ambiguous, settings });
-    });
-  };
-  const nodes = Object.entries(groups).flatMap(createGroup);
-  return { nodes: [createGanttFrame(svg)].concat(nodes), edges: [] };
-};
-
-export const renderGanttDiagram = async (
+const createGanttNode = (
   id: string,
-  source: string,
-  settings: TranslationSettings,
-) => {
-  const host = createLayoutHost(id, settings.fontFamily);
-  host.style.width = `${GANTT_LAYOUT_WIDTH}px`;
-  try {
-    const diagram = await mermaid.mermaidAPI.getDiagramFromText(source);
-    const db = diagram.db;
-    const getTasks = 'getTasks' in db ? db.getTasks : undefined;
-    const getDisplayMode = 'getDisplayMode' in db ? db.getDisplayMode : undefined;
-    const missingGetter = typeof getTasks !== 'function' || typeof getDisplayMode !== 'function';
-    if (missingGetter) throw ganttCompatibilityError();
-    const config = mermaid.mermaidAPI.getConfig();
-    const compact =
-      getDisplayMode.call(db) === 'compact' || config.gantt?.displayMode === 'compact';
-    const unsupported = compact || config.look === 'handDrawn';
-    if (unsupported) throw ganttCompatibilityError();
-    const tasks = readGanttTasks(getTasks.call(db));
-    host.replaceChildren();
-    host.innerHTML = (await mermaid.render(id, source, host)).svg;
-    const svg = host.querySelector('svg');
-    if (!svg) throw ganttCompatibilityError();
-    return createGanttElements(svg, id, tasks, settings);
-  } finally {
-    host.remove();
-  }
+  graphics: GanttGraphic[],
+  data: GanttNodeData,
+  frame: GanttBounds = combineGanttBounds(graphics.map(({ bounds }) => bounds)),
+): Node<GanttNodeData> => {
+  const parts = positionGanttParts(graphics, frame);
+  const position = { x: frame.x, y: frame.y };
+  const style = { width: frame.width, height: frame.height };
+  const selectable = data.kind === 'gantt-task';
+  const type = selectable ? GANTT_TASK_TYPE : GANTT_FRAME_TYPE;
+  const zIndex = selectable ? 1 : -1;
+  const content = Object.assign({}, data, { parts });
+  return {
+    id,
+    data: content,
+    position,
+    style,
+    type,
+    zIndex,
+    selectable,
+    draggable: false,
+    connectable: false,
+    deletable: false,
+    focusable: selectable,
+  };
 };
