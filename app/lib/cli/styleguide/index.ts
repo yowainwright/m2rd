@@ -5,13 +5,19 @@ import type { CliOptions } from '../types';
 import { STYLEGUIDE_EXAMPLE, STYLEGUIDE_EXPORT_PATH, STYLEGUIDE_VIEWPORT } from './constants';
 import { styleguideColors, svgStyleguideSource } from './utils';
 
-const formatStyleguide = (options: CliOptions) =>
-  renderDiagram(STYLEGUIDE_EXAMPLE, options).pipe(
-    Effect.map((diagram) => {
-      const colors = styleguideColors(options);
-      return `${diagram}\n\n${colors}`;
-    }),
+export const runStyleguide = (options: CliOptions) => {
+  if (options.output) return exportSvg(svgStyleguideSource(), options.output);
+  const interactive = Boolean(
+    process.stdout.isTTY && !process.env.CI && !process.env.GITHUB_ACTIONS,
   );
+  const width = interactive
+    ? Math.min(options.width, STYLEGUIDE_VIEWPORT.columns - 1)
+    : options.width;
+  const compact = Object.assign({}, options, { width });
+  return formatStyleguide(compact).pipe(
+    Effect.flatMap((content) => presentStyleguide(content, options, interactive)),
+  );
+};
 
 const presentStyleguide = (content: string, options: CliOptions, interactive: boolean) => {
   if (interactive) {
@@ -27,16 +33,10 @@ const presentStyleguide = (content: string, options: CliOptions, interactive: bo
   });
 };
 
-export const runStyleguide = (options: CliOptions) => {
-  if (options.output) return exportSvg(svgStyleguideSource(), options.output);
-  const interactive = Boolean(
-    process.stdout.isTTY && !process.env.CI && !process.env.GITHUB_ACTIONS,
+const formatStyleguide = (options: CliOptions) =>
+  renderDiagram(STYLEGUIDE_EXAMPLE, options).pipe(
+    Effect.map((diagram) => {
+      const colors = styleguideColors(options);
+      return `${diagram}\n\n${colors}`;
+    }),
   );
-  const width = interactive
-    ? Math.min(options.width, STYLEGUIDE_VIEWPORT.columns - 1)
-    : options.width;
-  const compact = Object.assign({}, options, { width });
-  return formatStyleguide(compact).pipe(
-    Effect.flatMap((content) => presentStyleguide(content, options, interactive)),
-  );
-};

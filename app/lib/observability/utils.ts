@@ -8,26 +8,6 @@ import type {
   ServerLoggerInput,
 } from './types';
 
-const defaultBrowserWriter: BrowserLogWriter = (value) => {
-  globalThis.console.info(value);
-};
-
-const redactLogArguments = (args: Parameters<LogFn>) => {
-  return args.map((arg) => redactTelemetry(arg)) as Parameters<LogFn>;
-};
-
-const logMethod = function redactedLogMethod(
-  this: ObservabilityLogger,
-  args: Parameters<LogFn>,
-  method: LogFn,
-) {
-  method.apply(this, redactLogArguments(args));
-};
-
-export const writeBrowserLog = (value: unknown, writer = defaultBrowserWriter) => {
-  writer(redactTelemetry(value));
-};
-
 export const createBrowserLogger = (input: BrowserLoggerInput = {}) => {
   const write = (value: unknown) => {
     writeBrowserLog(value, input.write);
@@ -44,6 +24,10 @@ export const createBrowserLogger = (input: BrowserLoggerInput = {}) => {
   });
 };
 
+export const writeBrowserLog = (value: unknown, writer = defaultBrowserWriter) => {
+  writer(redactTelemetry(value));
+};
+
 export const createServerLogger = (input: ServerLoggerInput = {}) => {
   const options = {
     hooks: { logMethod },
@@ -57,3 +41,19 @@ export const createServerLogger = (input: ServerLoggerInput = {}) => {
 
   return pino(options);
 };
+
+const defaultBrowserWriter: BrowserLogWriter = (value) => {
+  globalThis.console.info(value);
+};
+
+const logMethod = function redactedLogMethod(
+  this: ObservabilityLogger,
+  args: Parameters<LogFn>,
+  method: LogFn,
+) {
+  method.apply(this, redactLogArguments(args));
+};
+
+function redactLogArguments(args: Parameters<LogFn>) {
+  return args.map((arg) => redactTelemetry(arg)) as Parameters<LogFn>;
+}

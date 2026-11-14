@@ -3,7 +3,35 @@ import { parseArgs } from 'node:util';
 import { Effect } from 'effect';
 import { CLI_HELP, DEFAULT_WIDTH, MAX_WIDTH, MIN_WIDTH } from './constants';
 
-const parseOptions = () => {
+main().catch(async (cause: unknown) => {
+  process.exitCode = 1;
+  const message = cause instanceof Error ? cause.message : String(cause);
+  try {
+    const { formatError } = await import('./utils');
+    process.stderr.write(`${formatError(message)}\n`);
+  } catch {
+    process.stderr.write(`m2rd: ${message}\n`);
+  }
+});
+
+async function main() {
+  const options = parseOptions();
+  if (options.help) {
+    process.stdout.write(`${CLI_HELP}\n`);
+    return;
+  }
+  const { runCli, formatError } = await import('./utils');
+  const { runStyleguide } = await import('./styleguide');
+  const operation = options.styleguide ? runStyleguide(options) : runCli(options.paths, options);
+  const result = await Effect.runPromise(Effect.result(operation));
+  if (result._tag === 'Failure') {
+    process.stderr.write(`${formatError(result.failure)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+}
+
+function parseOptions() {
   const options = {
     ascii: { type: 'boolean' },
     width: { type: 'string' },
@@ -36,32 +64,4 @@ const parseOptions = () => {
   if (invalidOutput)
     throw new Error('--output must be a .svg file. CLI image export supports SVG.');
   return { paths, help: values.help, width, ascii: values.ascii ?? false, output, styleguide };
-};
-
-const main = async () => {
-  const options = parseOptions();
-  if (options.help) {
-    process.stdout.write(`${CLI_HELP}\n`);
-    return;
-  }
-  const { runCli, formatError } = await import('./utils');
-  const { runStyleguide } = await import('./styleguide');
-  const operation = options.styleguide ? runStyleguide(options) : runCli(options.paths, options);
-  const result = await Effect.runPromise(Effect.result(operation));
-  if (result._tag === 'Failure') {
-    process.stderr.write(`${formatError(result.failure)}\n`);
-    process.exitCode = 1;
-    return;
-  }
-};
-
-main().catch(async (cause: unknown) => {
-  process.exitCode = 1;
-  const message = cause instanceof Error ? cause.message : String(cause);
-  try {
-    const { formatError } = await import('./utils');
-    process.stderr.write(`${formatError(message)}\n`);
-  } catch {
-    process.stderr.write(`m2rd: ${message}\n`);
-  }
-});
+}

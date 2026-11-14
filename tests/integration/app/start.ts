@@ -13,17 +13,6 @@ vi.mock('next/dynamic', () => ({
   },
 }));
 
-const matchMedia = (query: string): MediaQueryList => ({
-  matches: false,
-  media: query,
-  onchange: null,
-  addListener: vi.fn(),
-  removeListener: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  dispatchEvent: vi.fn(),
-});
-
 const layoutRect = {
   bottom: 768,
   height: 768,
@@ -53,3 +42,16 @@ describe('app startup', () => {
     expect(screen.getByRole('heading', { name: 'React Flow output' })).toBeTruthy();
   });
 });
+
+function matchMedia(query: string): MediaQueryList {
+  return {
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  };
+}

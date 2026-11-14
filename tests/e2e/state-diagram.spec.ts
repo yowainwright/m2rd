@@ -1,20 +1,6 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-const moveStateNode = async (page: Page, node: Locator) => {
-  const original = await node.getAttribute('style');
-  const bounds = await node.boundingBox();
-  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(bounds!.x + bounds!.width / 2 + 35, bounds!.y + bounds!.height / 2 + 25, {
-    steps: 5,
-  });
-  await page.mouse.up();
-  await expect(node).not.toHaveAttribute('style', original!);
-  const moved = await node.getAttribute('style');
-  return moved;
-};
-
 const source = `stateDiagram-v2
     direction LR
     state Decision <<choice>>
@@ -34,6 +20,7 @@ const source = `stateDiagram-v2
         Waiting for input
     end note
 `;
+
 const concurrent = `stateDiagram-v2
     [*] --> Active
     state Active {
@@ -47,17 +34,6 @@ const concurrent = `stateDiagram-v2
     }
     Active --> [*]
 `;
-
-const chooseSample = async (page: Page, name: string) => {
-  await page.getByRole('button', { name: 'New', exact: true }).click();
-  await page.getByRole('menuitem', { name, exact: true }).click();
-};
-const updateSource = async (page: Page, value: string) => {
-  await page.locator('.cm-content').click();
-  await page.keyboard.press('ControlOrMeta+A');
-  await page.keyboard.insertText(value);
-  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
-};
 
 test('selects each sample and starts a new unsaved state document', async ({ page }, testInfo) => {
   await page.goto('./');
@@ -278,3 +254,29 @@ test('supports mobile sample selection and recovery after invalid state input', 
   await expect(viewError).toHaveCount(0);
   await expect(page.locator('.cm-lintRange-error')).toHaveCount(0);
 });
+
+async function moveStateNode(page: Page, node: Locator) {
+  const original = await node.getAttribute('style');
+  const bounds = await node.boundingBox();
+  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds!.x + bounds!.width / 2 + 35, bounds!.y + bounds!.height / 2 + 25, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect(node).not.toHaveAttribute('style', original!);
+  const moved = await node.getAttribute('style');
+  return moved;
+}
+
+async function chooseSample(page: Page, name: string) {
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
+}
+
+async function updateSource(page: Page, value: string) {
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.insertText(value);
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+}

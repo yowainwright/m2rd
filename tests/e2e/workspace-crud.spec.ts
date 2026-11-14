@@ -2,540 +2,13 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 import { readFile } from 'node:fs/promises';
 import packageMetadata from '../../package.json' with { type: 'json' };
 
-const checkSidebarLifecycle = async ({ page }: { page: Page }, testInfo: TestInfo) => {
-  const { toggle, sidebar, navigation, empty } = await openEmptySidebar(page, testInfo);
-  await renameGraph(page, 'Unsaved draft');
-  await expect(toggle).toBeVisible();
-  await saveNamedGraph(page, 'Saved sidebar graph');
-  await expect(toggle).toBeVisible();
-  await openSavedGraphs(page);
-  await expect(empty).toHaveCount(0);
-  await expect(
-    navigation.getByRole('button', { name: 'Saved sidebar graph', exact: true }),
-  ).toBeVisible();
-  await page.reload();
-  await expect(toggle).toBeVisible();
-  await openSavedGraphs(page);
-  await expect(
-    navigation.getByRole('button', { name: 'Saved sidebar graph', exact: true }),
-  ).toBeVisible();
-  await sidebar.getByRole('button', { name: 'Close sidebar' }).click();
-  await expect(navigation).not.toBeInViewport();
-  await createNewGraph(page);
-  await expect(toggle).toBeVisible();
-  await openSavedGraphs(page);
-  await navigation.getByRole('button', { name: 'Saved sidebar graph', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Rename graph' })).toHaveText(
-    'Saved sidebar graph',
-  );
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
-  await expect(toggle).toBeVisible();
-  await openSavedGraphs(page);
-  await expect(navigation.locator('[data-sidebar="menu-button"]')).toHaveCount(0);
-  await expect(empty).toBeVisible();
-  await expect(sidebar.getByRole('list', { name: 'Open-source credits' })).toBeVisible();
-  await sidebar.getByRole('button', { name: 'Close sidebar' }).click();
-  await page.reload();
-  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
-  await expect(toggle).toBeVisible();
-  await openSavedGraphs(page);
-  await expect(navigation.locator('[data-sidebar="menu-button"]')).toHaveCount(0);
-};
-
-const checkSidebarScrolling = async ({ page }: { page: Page }) => {
-  const { sidebar, footer, scrollport, graphButtons, footerBefore } =
-    await openScrollableSidebar(page);
-  const sidebarBounds = await getBounds(sidebar);
-  const sidebarInnerWidth = await sidebar.evaluate((element) => element.clientWidth);
-  expect(footerBefore.x).toBe(sidebarBounds.x);
-  expect(footerBefore.width).toBe(sidebarInnerWidth);
-  await expect(footer).toHaveCSS('border-top-width', '1px');
-  expect(await scrollport.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
-    true,
-  );
-  await scrollport.evaluate((element) => {
-    element.scrollTop = element.scrollHeight;
-  });
-  expect(await scrollport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-  const lastGraph = graphButtons.last();
-  const lastBounds = await getBounds(lastGraph);
-  const listBounds = await getBounds(scrollport);
-  expect(lastBounds.y).toBeGreaterThanOrEqual(listBounds.y);
-  expect(lastBounds.y + lastBounds.height).toBeLessThanOrEqual(listBounds.y + listBounds.height);
-  expect(listBounds.y + listBounds.height).toBeLessThanOrEqual(footerBefore.y);
-  expect(footerBefore.y - listBounds.y - listBounds.height).toBeLessThanOrEqual(8);
-  expect(await getBounds(footer)).toEqual(footerBefore);
-  await lastGraph.click();
-  await expect(page.getByRole('button', { name: 'Rename graph' })).toHaveText('Saved graph 1');
-};
-
-const expectLoopingGifExport = async (page: Page) => {
-  const gifDownloadPromise = page.waitForEvent('download');
-
-  await selectDownload(page, 'GIF loop');
-
-  const gifDownload = await gifDownloadPromise;
-  const gifOutputPath = '.next/cache/playwright/export.gif';
-
-  await gifDownload.saveAs(gifOutputPath);
-
-  const gif = await readFile(gifOutputPath);
-
-  expect(gifDownload.suggestedFilename()).toBe('m2rd-graph.gif');
-  expect(gif.subarray(0, 6).toString('ascii')).toBe('GIF89a');
-  expect(gif.toString('latin1')).toContain('NETSCAPE2.0');
-};
-
-const openScrollableSidebar = async (page: Page) => {
-  test.setTimeout(60_000);
-  await page.goto('./');
-  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
-  await createScrollableGraphList(page);
-  const navigation = await openSavedGraphs(page);
-  const sidebar = page.locator('[data-sidebar="sidebar"]');
-  const footer = sidebar.locator('[data-sidebar="footer"]');
-  const scrollport = sidebar.locator('[data-sidebar="group-content"]');
-  const graphButtons = navigation.locator('[data-sidebar="menu-button"]');
-  await expect(graphButtons).toHaveCount(12);
-  await expectThreeCreditLines(footer);
-  await footer.getByRole('link', { name: 'm2rd', exact: true }).click({ trial: true });
-  const footerBefore = await getBounds(footer);
-  return { sidebar, footer, scrollport, graphButtons, footerBefore };
-};
-
-const openEmptySidebar = async (page: Page, testInfo: TestInfo) => {
-  await page.goto('./');
-  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
-  const toggle = page.getByRole('button', { name: 'Toggle Sidebar' });
-  const sidebar = page.locator('[data-sidebar="sidebar"]');
-  await expect(toggle).toBeVisible();
-  const navigation = await openSavedGraphs(page);
-  const empty = navigation.locator('[data-slot="empty"]');
-  await expect(empty).toContainText('No saved graphs yet');
-  await expect(empty).toContainText('Save a diagram to see it here.');
-  await expect(empty.locator('svg.lucide-file-x')).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('empty-sidebar.png') });
-  await expect(navigation.locator('[data-sidebar="menu-button"]')).toHaveCount(0);
-  await expect(sidebar.getByRole('list', { name: 'Open-source credits' })).toBeVisible();
-  await sidebar.getByRole('button', { name: 'Close sidebar' }).click();
-  await expect(page.getByRole('heading', { name: 'Saved graphs' })).not.toBeInViewport();
-  return { toggle, sidebar, navigation, empty };
-};
-
-const expectPngExport = async (page: Page) => {
-  const pngDownloadPromise = page.waitForEvent('download');
-
-  await selectDownload(page, 'PNG');
-
-  const pngDownload = await pngDownloadPromise;
-  const pngOutputPath = '.next/cache/playwright/export.png';
-
-  await pngDownload.saveAs(pngOutputPath);
-
-  const png = await readFile(pngOutputPath);
-  const pngSignature = Array.from(png.subarray(0, 4));
-
-  expect(pngDownload.suggestedFilename()).toBe('m2rd-graph.png');
-  expect(pngSignature).toEqual([0x89, 0x50, 0x4e, 0x47]);
-};
-
-const expectStyledSvgExport = async (page: Page) => {
-  const downloadPromise = page.waitForEvent('download');
-
-  await selectDownload(page, 'SVG');
-
-  const download = await downloadPromise;
-  const outputPath = '.next/cache/playwright/export.svg';
-
-  await download.saveAs(outputPath);
-
-  const svg = await readFile(outputPath, 'utf8');
-
-  expect(download.suggestedFilename()).toBe('m2rd-graph.svg');
-  expect(svg).toContain('<svg');
-  expect(svg).toContain('Write Mermaid');
-  expect(svg).toContain('rgb(239, 68, 68)');
-};
-
-const expectRedactedInputEvent = async (page: Page) => {
-  let consoleMessages: unknown[] = [];
-
-  page.on('console', (message) => {
-    const [firstArgument] = message.args();
-    const isInfo = message.type() === 'info';
-    const hasArgument = Boolean(firstArgument);
-    const shouldSkipMessage = !isInfo || !hasArgument;
-
-    if (shouldSkipMessage) {
-      return;
-    }
-
-    void firstArgument
-      .jsonValue()
-      .then((value) => {
-        const isObjectValue = value !== null && typeof value === 'object';
-
-        if (isObjectValue) {
-          consoleMessages = consoleMessages.concat(value);
-        }
-      })
-      .catch(() => {});
-  });
-
-  await page.goto('./');
-
-  await updateEditor(page);
-
-  await expect
-    .poll(() => consoleMessages)
-    .toContainEqual(
-      expect.objectContaining({
-        event: 'input.update',
-        msg: 'm2rd app event',
-        source: '[REDACTED]',
-      }),
-    );
-};
-
-const resizePanelsWithPointer = async (
-  page: Page,
-  editor: Locator,
-  canvas: Locator,
-  handle: Locator,
-) => {
-  const editorBefore = await getBounds(editor);
-  const canvasBefore = await getBounds(canvas);
-  const handleBefore = await getBounds(handle);
-  const x = handleBefore.x + handleBefore.width / 2;
-  const y = handleBefore.y + handleBefore.height / 2;
-
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x + 140, y, { steps: 12 });
-  await page.mouse.up();
-
-  const minimumEditorWidth = editorBefore.width + 100;
-  const maximumCanvasWidth = canvasBefore.width - 100;
-  await expect
-    .poll(async () => (await getBounds(editor)).width)
-    .toBeGreaterThan(minimumEditorWidth);
-  await expect.poll(async () => (await getBounds(canvas)).width).toBeLessThan(maximumCanvasWidth);
-};
-
-const waitForPanelTransitions = async (page: Page) => {
-  await page.locator('#workspace-panels').evaluate(async (group) => {
-    const elements = [group, ...group.querySelectorAll('[data-panel]')];
-    const transitions = elements.flatMap((element) => element.getAnimations());
-    for (const transition of transitions) {
-      await transition.finished;
-    }
-  });
-};
-
-const togglePanelFocusAndRestore = async (page: Page, panel: 'mermaid' | 'react-flow') => {
-  const isMermaid = panel === 'mermaid';
-  const panelId = isMermaid ? 'mermaid-panel' : 'flow-panel';
-  const siblingId = isMermaid ? 'flow-panel' : 'mermaid-panel';
-  const panelLabel = isMermaid ? 'Mermaid input' : 'React Flow output';
-  const siblingLabel = isMermaid ? 'React Flow output' : 'Mermaid input';
-  const splitChevron = isMermaid ? 'right' : 'left';
-  const focusedChevron = isMermaid ? 'left' : 'right';
-  const selectedPanel = page.locator(`#${panelId}`);
-  const siblingPanel = page.locator(`#${siblingId}`);
-  const toggle = page.getByRole('button', { name: `Toggle focus for ${panelLabel} pane` });
-  await waitForPanelTransitions(page);
-  const selectedBefore = await getBounds(selectedPanel);
-  const siblingBefore = await getBounds(siblingPanel);
-
-  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${splitChevron}`));
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${focusedChevron}`));
-  await expect(page.getByRole('heading', { name: siblingLabel, exact: true })).toBeHidden();
-  await expect(siblingPanel).toHaveCSS('width', '0px');
-  await expect
-    .poll(async () => (await getBounds(selectedPanel)).width)
-    .toBeGreaterThan(selectedBefore.width + 100);
-
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${splitChevron}`));
-  await waitForPanelTransitions(page);
-  await expect
-    .poll(async () => Math.abs((await getBounds(selectedPanel)).width - selectedBefore.width))
-    .toBeLessThan(2);
-  await expect
-    .poll(async () => Math.abs((await getBounds(siblingPanel)).width - siblingBefore.width))
-    .toBeLessThan(2);
-};
-
-const panCanvas = async (page: Page, deltaX: number) => {
-  const pane = page.locator('.react-flow__pane');
-  const bounds = await getBounds(pane);
-  const startX = bounds.x + bounds.width - 16;
-  const startY = bounds.y + bounds.height - 16;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + deltaX, startY, { steps: 8 });
-  await page.mouse.up();
-};
-
-const writeLegacyRecords = () =>
-  new Promise<void>((resolve, reject) => {
-    const request = indexedDB.open('m2rd');
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const database = request.result;
-      const transaction = database.transaction(['translations', 'workspaces'], 'readwrite');
-      const translations = transaction.objectStore('translations');
-      const workspaces = transaction.objectStore('workspaces');
-      const readTranslations = translations.getAll();
-      const readWorkspaces = workspaces.getAll();
-      readTranslations.onsuccess = () => {
-        const [translation] = readTranslations.result;
-        const settingsEntries = Object.entries(translation.settings);
-        const legacyEntries = settingsEntries.filter(([key]) => key !== 'edgeMarker');
-        const settings = Object.fromEntries(legacyEntries);
-        const [first, second] = translation.elements.edges;
-        const style = Object.assign({}, first.style, { stroke: '#a855f7', strokeWidth: 99 });
-        const edge = Object.assign({}, first, { markerEnd: { type: 'arrowclosed' }, style });
-        const elements = Object.assign({}, translation.elements, { edges: [edge, second] });
-        const legacy = Object.assign({}, translation, { elements, settings });
-        translations.put(legacy);
-      };
-      readWorkspaces.onsuccess = () => {
-        const [workspace] = readWorkspaces.result;
-        const legacy = Object.assign({}, workspace, { name: 'Untitled Graph' });
-        workspaces.put(legacy);
-      };
-      transaction.oncomplete = () => {
-        database.close();
-        resolve();
-      };
-      transaction.onabort = () => {
-        database.close();
-        reject(transaction.error);
-      };
-    };
-  });
-
-const storeLegacyRecords = (page: Page) => page.evaluate(writeLegacyRecords);
-
-const setGlobalMarkers = async (page: Page) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('./');
-  await updateEditor(page);
-  const edges = page.locator('.react-flow__edge');
-  const firstEdge = edges.nth(0);
-  const secondEdge = edges.nth(1);
-  const width = page.getByRole('spinbutton', { name: 'Width' });
-  await expect(edges).toHaveCount(2);
-  await expect
-    .poll(() => readMarker(firstEdge))
-    .toEqual({ fill: 'rgb(23, 23, 23)', stroke: 'rgb(23, 23, 23)' });
-
-  await openToolkit(page);
-  await selectMarker(page, 'Open arrow');
-  await setColorInput(page.getByLabel('Color', { exact: true }), '#ef4444');
-  await page.getByRole('spinbutton', { name: 'Width' }).fill('99');
-  await expect(width).toHaveValue('8');
-  await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke-width', '8px');
-  await expect(secondEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke-width', '8px');
-  await expect
-    .poll(() => readMarker(firstEdge))
-    .toEqual({ fill: 'none', stroke: 'rgb(239, 68, 68)' });
-  await expect
-    .poll(() => readMarker(secondEdge))
-    .toEqual({ fill: 'none', stroke: 'rgb(239, 68, 68)' });
-  return { firstEdge, secondEdge, width };
-};
-
-const verifyReloadedEdgeMarkers = async (page: Page, firstEdge: Locator, secondEdge: Locator) => {
-  await page.reload();
-  await expect(firstEdge).toBeVisible();
-  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Marker', exact: true })).toHaveText('None');
-  await expect.poll(() => readMarker(firstEdge)).toBeNull();
-  await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke', 'rgb(34, 197, 94)');
-  await expect
-    .poll(() => readMarker(secondEdge))
-    .toEqual({ fill: 'none', stroke: 'rgb(239, 68, 68)' });
-  await selectMarker(page, 'Filled arrow');
-  await expect
-    .poll(() => readMarker(firstEdge))
-    .toEqual({ fill: 'rgb(34, 197, 94)', stroke: 'rgb(34, 197, 94)' });
-};
-
-const saveUnnamedGraph = async (page: Page) => {
-  let reactFlowWarnings: string[] = [];
-
-  page.on('console', (message) => {
-    const text = message.text();
-    const isReactFlowTypeMapWarning = text.includes(reactFlowTypeMapWarning);
-
-    if (!isReactFlowTypeMapWarning) {
-      return;
-    }
-
-    reactFlowWarnings = reactFlowWarnings.concat(text);
-  });
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('./');
-  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
-  expect(reactFlowWarnings).toHaveLength(0);
-  await page.keyboard.press('Escape');
-  const navigation = page.getByRole('navigation', { name: 'Saved graphs' });
-  const graphButtons = navigation.locator('[data-sidebar="menu-button"]');
-  const graphName = page.getByRole('button', { name: 'Rename graph', exact: true });
-  await expect(graphButtons).toHaveCount(0);
-
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
-  await expect(graphButtons).toHaveCount(1);
-  await expect(graphButtons).toHaveText(/^[a-f0-9-]{36}$/);
-  const savedId = await graphButtons.innerText();
-  await expect(graphName).toHaveText(savedId);
-  await page.reload();
-  await expect(graphName).toHaveText(savedId);
-  await graphName.click();
-  const titleInput = page.getByRole('textbox', { name: 'Graph name', exact: true });
-  await expect(titleInput).toHaveValue('');
-  await titleInput.press('Escape');
-  await expect(graphName).toHaveText(savedId);
-  return { navigation, graphButtons, graphName };
-};
-
-const createRemainingVersions = async (page: Page, viewport: Locator, firstCamera: string) => {
-  await editSnapshot(page, 2);
-  const node = page.locator('.react-flow__node[data-id="A"]');
-  await node.click();
-  await page.getByRole('button', { name: 'adj diagram' }).click();
-  await setColorInput(page.getByLabel('Fill'), '#22c55e');
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'zoom in', exact: true }).click();
-  await expect(viewport).not.toHaveCSS('transform', firstCamera);
-  await saveSnapshot(page, 2);
-  await editSnapshot(page, 3);
-  await saveSnapshot(page, 3);
-  await editSnapshot(page, 4);
-  await saveSnapshot(page, 4);
-  await editSnapshot(page, 5);
-  await saveSnapshot(page, 5);
-  return node;
-};
-
-const createStyledVersion = async (page: Page) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('./');
-  await editSnapshot(page, 1);
-  await renameGraph(page, 'Versioned diagram');
-  await page.getByRole('button', { name: 'adj diagram' }).click();
-  await setColorInput(page.getByLabel('Fill'), '#ef4444');
-  await page.keyboard.press('Escape');
-  await saveSnapshot(page, 1);
-  const history = page.getByRole('region', { name: 'Version history' });
-  const workspaceButton = page.getByRole('button', { name: 'Versioned diagram' });
-  await expect(history).toBeVisible();
-  await expect(workspaceButton).toHaveAttribute('aria-expanded', 'true');
-  await workspaceButton.click();
-  await expect(history).not.toBeVisible();
-  await expect(workspaceButton).toHaveAttribute('aria-expanded', 'false');
-  await workspaceButton.click();
-  await expect(history).toBeVisible();
-  const viewport = page.locator('.react-flow__viewport');
-  const firstCamera = await viewport.evaluate((element) => getComputedStyle(element).transform);
-  return { history, viewport, firstCamera };
-};
-
-const expectSidebarCredits = async (page: Page, header: Locator, sidebar: Locator) => {
-  await expect(
-    sidebar.locator('[data-sidebar="header"]').getByText('m2rd', { exact: true }),
-  ).toBeVisible();
-  await expect(sidebar.getByRole('heading', { name: 'Saved graphs', exact: true })).toBeVisible();
-  const footer = sidebar.locator('[data-sidebar="footer"]');
-  await expect(footer.getByRole('link', { name: 'm2rd', exact: true })).toHaveAttribute(
-    'href',
-    repository.url,
-  );
-  await expect(
-    footer.getByText(
-      'm2rd currently supports flow, sequence, state, class, ER, and Gantt diagrams; more soon! made with:',
-      { exact: true },
-    ),
-  ).toBeVisible();
-  const footerMetadata = `v${version} · ${license} · ${new Date().getFullYear()}`;
-  await expect(footer.getByText(footerMetadata, { exact: true })).toBeVisible();
-  await expect(
-    header.getByRole('link', { name: 'GitHub repository', exact: true }),
-  ).toHaveAttribute('href', repository.url);
-  await expect(footer.getByRole('heading')).toHaveCount(0);
-  const credits = footer.getByRole('list', { name: 'Open-source credits' });
-  await expectThreeCreditLines(footer);
-  expect(
-    await credits
-      .getByRole('link')
-      .evaluateAll((links) => links.map((link) => [link.textContent, link.getAttribute('href')])),
-  ).toEqual([
-    ['Mermaid', 'https://mermaid.js.org/'],
-    ['React Flow', 'https://reactflow.dev/'],
-    ['XState', 'https://stately.ai/docs/xstate'],
-    ['Effect', 'https://effect.website/'],
-    ['shadcn/ui', 'https://ui.shadcn.com/'],
-    ['Codex', 'https://github.com/openai/codex'],
-    ['Tailwind CSS', 'https://tailwindcss.com/'],
-    ['Next.js', 'https://nextjs.org/'],
-    ['Dexie', 'https://dexie.org/'],
-  ]);
-};
-
-const expectHeaderActions = async (page: Page, header: Locator) => {
-  const names = await header
-    .getByRole('button')
-    .evaluateAll((buttons) =>
-      buttons.map((button) => button.getAttribute('aria-label') || button.textContent?.trim()),
-    );
-  expect(names).toEqual(['Toggle Sidebar', 'New', 'Rename graph', 'Save', 'Download', 'Delete']);
-  const actions = header.locator('button[aria-label]').filter({ has: page.locator('svg') });
-  await expect(actions).toHaveCount(3);
-  expect(await actions.allTextContents()).toEqual(['', '', '']);
-  const classes = await actions.evaluateAll((buttons) => buttons.map((button) => button.className));
-  expect(
-    classes.every((value) => {
-      const tokens = new Set(value.split(/\s+/));
-      const matches = !tokens.has('bg-background') && tokens.has('h-7') && tokens.has('w-7');
-      return matches;
-    }),
-  ).toBe(true);
-  await expect(header.getByRole('heading', { name: 'm2rd', exact: true })).toBeVisible();
-
-  const create = header.getByRole('button', { name: 'New', exact: true });
-  const sidebarTrigger = header.getByRole('button', { name: 'Toggle Sidebar' });
-  await expect(sidebarTrigger).toHaveCSS('width', '28px');
-  await expect(sidebarTrigger).toHaveCSS('height', '28px');
-  await expect(sidebarTrigger.locator('svg')).toHaveCSS('width', '16px');
-  await expect(sidebarTrigger.locator('svg')).toHaveCSS('height', '16px');
-  await create.hover();
-  await expect(page.getByRole('tooltip')).toHaveText('New');
-  await page.mouse.move(0, 0);
-  await create.focus();
-  await expect(page.getByRole('tooltip')).toHaveText('New');
-  const save = header.getByRole('button', { name: 'Save', exact: true });
-  await expect(save).toHaveText('save(⌃s / ⌘s)');
-  await expect(save).toHaveAttribute('aria-keyshortcuts', 'Control+s Meta+s');
-  await save.click();
-  await expect(header.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
-  await header.getByRole('button', { name: 'Download', exact: true }).click();
-  await expect(page.getByRole('menuitem')).toHaveText(['SVG', 'PNG', 'GIF loop', 'GIF once']);
-  await page.keyboard.press('Escape');
-};
-
 const { license, repository, version } = packageMetadata;
 
 const source = `flowchart LR
   Alpha[Write Mermaid] --> Beta[Build graph]
   Beta --> Gamma[React Flow preview]
 `;
+
 const sequenceSource = `sequenceDiagram
   participant A as Alice
   participant B as Bob
@@ -543,141 +16,8 @@ const sequenceSource = `sequenceDiagram
   B-->>A: Hi
   A->>A: Think
 `;
+
 const reactFlowTypeMapWarning = 'created a new nodeTypes or edgeTypes object';
-
-const updateEditor = async (page: Page, content = source) => {
-  const editor = page.locator('.cm-content');
-
-  await editor.click();
-  await page.keyboard.press('ControlOrMeta+A');
-  await page.keyboard.insertText(content);
-};
-
-const createNewGraph = async (page: Page) => {
-  await page.getByRole('button', { name: 'New', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Sequence', exact: true }).click();
-};
-
-const setColorInput = async (locator: Locator, value: string) => {
-  await locator.evaluate((element, color) => {
-    const input = element as HTMLInputElement;
-    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-
-    descriptor?.set?.call(input, color);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }, value);
-};
-
-const getBounds = async (locator: Locator) => {
-  const bounds = await locator.boundingBox();
-  expect(bounds).not.toBeNull();
-  return bounds!;
-};
-
-const selectDownload = async (page: Page, name: string) => {
-  await page.getByRole('button', { name: 'Download', exact: true }).click();
-  await page.getByRole('menuitem', { name, exact: true }).click();
-};
-
-const selectMarker = async (page: Page, name: string) => {
-  await page.getByRole('combobox', { name: 'Marker', exact: true }).click();
-  await page.getByRole('option', { name, exact: true }).click();
-};
-
-const openToolkit = async (page: Page) => {
-  const background = page.getByRole('combobox', { name: 'Background', exact: true });
-  const isOpen = await background.isVisible();
-  if (!isOpen) await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
-  await expect(background).toBeVisible();
-};
-
-const readMarker = (edge: Locator) => {
-  return edge.locator('.react-flow__edge-path').evaluate((path) => {
-    const reference = path.getAttribute('marker-end') || '';
-    const id = reference.match(/#([^'")]+)/)?.[1];
-    const marker = id ? document.getElementById(id) : null;
-    const shape = marker?.querySelector('polyline');
-    if (!shape) {
-      return null;
-    }
-
-    const { fill, stroke } = getComputedStyle(shape);
-    return { fill, stroke };
-  });
-};
-
-const versionSource = (version: number) => {
-  return `flowchart LR\n  A[Snapshot ${version}] --> B[Saved graph]`;
-};
-
-const saveSnapshot = async (page: Page, version: number) => {
-  await page.getByRole('button', { name: /^(Save|Saved)$/ }).click();
-  const history = page.getByRole('region', { name: 'Version history' });
-  await expect(
-    history.getByRole('button', { name: new RegExp(`^v${version}\\b`) }),
-  ).toHaveAttribute('aria-pressed', 'true');
-};
-
-const editSnapshot = async (page: Page, version: number) => {
-  await updateEditor(page, versionSource(version));
-  await expect(
-    page.locator('.react-flow__node').filter({ hasText: `Snapshot ${version}` }),
-  ).toBeVisible();
-};
-
-const renameGraph = async (page: Page, name: string) => {
-  const title = page.getByRole('button', { name: 'Rename graph', exact: true });
-  await title.click();
-  const graphName = page.getByRole('textbox', { name: 'Graph name', exact: true });
-  await page.getByRole('textbox', { name: 'Graph name', exact: true }).fill(name);
-  await graphName.press('Enter');
-  await expect(title).toHaveText(name);
-};
-
-const saveNamedGraph = async (page: Page, name: string) => {
-  await renameGraph(page, name);
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
-};
-
-const openSavedGraphs = async (page: Page) => {
-  const navigation = page.getByRole('navigation', { name: 'Saved graphs' });
-  const heading = page.getByRole('heading', { name: 'Saved graphs', exact: true });
-  const isVisible = await heading.isVisible();
-  const collapsed = await page.locator('[data-state="collapsed"][data-side="left"]').count();
-  const shouldOpen = !isVisible || collapsed > 0;
-  if (shouldOpen) await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
-  await expect(heading).toBeInViewport();
-  return navigation;
-};
-
-const expectThreeCreditLines = async (footer: Locator) => {
-  const rows = footer
-    .getByRole('list', { name: 'Open-source credits' })
-    .locator(':scope > li > ul');
-  await expect(rows).toHaveCount(3);
-  const lineCounts = await rows.evaluateAll((elements) =>
-    elements.map((element) => {
-      const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
-      return element.getBoundingClientRect().height / lineHeight;
-    }),
-  );
-  expect(lineCounts).toEqual([1, 1, 1]);
-  await expect(rows.nth(0).getByRole('link')).toHaveText(['Mermaid', 'React Flow', 'XState']);
-  await expect(rows.nth(1).getByRole('link')).toHaveText(['Effect', 'shadcn/ui', 'Codex']);
-  await expect(rows.nth(2).getByRole('link')).toHaveText(['Tailwind CSS', 'Next.js', 'Dexie']);
-};
-
-const createScrollableGraphList = async (page: Page) => {
-  const names = Array.from({ length: 12 }, (_, index) => `Saved graph ${index + 1}`);
-  await names.reduce(async (previous, name, index) => {
-    await previous;
-    const needsNewGraph = index > 0;
-    if (needsNewGraph) await createNewGraph(page);
-    await saveNamedGraph(page, name);
-  }, Promise.resolve());
-};
 
 [
   { name: 'desktop', viewport: { width: 1440, height: 640 } },
@@ -1262,3 +602,668 @@ test('saves selected node visual edits after Mermaid update', async ({ page }) =
   expect(onceGif.subarray(0, 6).toString('ascii')).toBe('GIF89a');
   expect(onceGif.toString('latin1')).not.toContain('NETSCAPE2.0');
 });
+
+async function checkSidebarLifecycle({ page }: { page: Page }, testInfo: TestInfo) {
+  const { toggle, sidebar, navigation, empty } = await openEmptySidebar(page, testInfo);
+  await renameGraph(page, 'Unsaved draft');
+  await expect(toggle).toBeVisible();
+  await saveNamedGraph(page, 'Saved sidebar graph');
+  await expect(toggle).toBeVisible();
+  await openSavedGraphs(page);
+  await expect(empty).toHaveCount(0);
+  await expect(
+    navigation.getByRole('button', { name: 'Saved sidebar graph', exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(toggle).toBeVisible();
+  await openSavedGraphs(page);
+  await expect(
+    navigation.getByRole('button', { name: 'Saved sidebar graph', exact: true }),
+  ).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Close sidebar' }).click();
+  await expect(navigation).not.toBeInViewport();
+  await createNewGraph(page);
+  await expect(toggle).toBeVisible();
+  await openSavedGraphs(page);
+  await navigation.getByRole('button', { name: 'Saved sidebar graph', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Rename graph' })).toHaveText(
+    'Saved sidebar graph',
+  );
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(toggle).toBeVisible();
+  await openSavedGraphs(page);
+  await expect(navigation.locator('[data-sidebar="menu-button"]')).toHaveCount(0);
+  await expect(empty).toBeVisible();
+  await expect(sidebar.getByRole('list', { name: 'Open-source credits' })).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Close sidebar' }).click();
+  await page.reload();
+  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
+  await expect(toggle).toBeVisible();
+  await openSavedGraphs(page);
+  await expect(navigation.locator('[data-sidebar="menu-button"]')).toHaveCount(0);
+}
+
+async function checkSidebarScrolling({ page }: { page: Page }) {
+  const { sidebar, footer, scrollport, graphButtons, footerBefore } =
+    await openScrollableSidebar(page);
+  const sidebarBounds = await getBounds(sidebar);
+  const sidebarInnerWidth = await sidebar.evaluate((element) => element.clientWidth);
+  expect(footerBefore.x).toBe(sidebarBounds.x);
+  expect(footerBefore.width).toBe(sidebarInnerWidth);
+  await expect(footer).toHaveCSS('border-top-width', '1px');
+  expect(await scrollport.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
+    true,
+  );
+  await scrollport.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  expect(await scrollport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  const lastGraph = graphButtons.last();
+  const lastBounds = await getBounds(lastGraph);
+  const listBounds = await getBounds(scrollport);
+  expect(lastBounds.y).toBeGreaterThanOrEqual(listBounds.y);
+  expect(lastBounds.y + lastBounds.height).toBeLessThanOrEqual(listBounds.y + listBounds.height);
+  expect(listBounds.y + listBounds.height).toBeLessThanOrEqual(footerBefore.y);
+  expect(footerBefore.y - listBounds.y - listBounds.height).toBeLessThanOrEqual(8);
+  expect(await getBounds(footer)).toEqual(footerBefore);
+  await lastGraph.click();
+  await expect(page.getByRole('button', { name: 'Rename graph' })).toHaveText('Saved graph 1');
+}
+
+async function expectLoopingGifExport(page: Page) {
+  const gifDownloadPromise = page.waitForEvent('download');
+
+  await selectDownload(page, 'GIF loop');
+
+  const gifDownload = await gifDownloadPromise;
+  const gifOutputPath = '.next/cache/playwright/export.gif';
+
+  await gifDownload.saveAs(gifOutputPath);
+
+  const gif = await readFile(gifOutputPath);
+
+  expect(gifDownload.suggestedFilename()).toBe('m2rd-graph.gif');
+  expect(gif.subarray(0, 6).toString('ascii')).toBe('GIF89a');
+  expect(gif.toString('latin1')).toContain('NETSCAPE2.0');
+}
+
+async function openScrollableSidebar(page: Page) {
+  test.setTimeout(60_000);
+  await page.goto('./');
+  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
+  await createScrollableGraphList(page);
+  const navigation = await openSavedGraphs(page);
+  const sidebar = page.locator('[data-sidebar="sidebar"]');
+  const footer = sidebar.locator('[data-sidebar="footer"]');
+  const scrollport = sidebar.locator('[data-sidebar="group-content"]');
+  const graphButtons = navigation.locator('[data-sidebar="menu-button"]');
+  await expect(graphButtons).toHaveCount(12);
+  await expectThreeCreditLines(footer);
+  await footer.getByRole('link', { name: 'm2rd', exact: true }).click({ trial: true });
+  const footerBefore = await getBounds(footer);
+  return { sidebar, footer, scrollport, graphButtons, footerBefore };
+}
+
+async function openEmptySidebar(page: Page, testInfo: TestInfo) {
+  await page.goto('./');
+  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
+  const toggle = page.getByRole('button', { name: 'Toggle Sidebar' });
+  const sidebar = page.locator('[data-sidebar="sidebar"]');
+  await expect(toggle).toBeVisible();
+  const navigation = await openSavedGraphs(page);
+  const empty = navigation.locator('[data-slot="empty"]');
+  await expect(empty).toContainText('No saved graphs yet');
+  await expect(empty).toContainText('Save a diagram to see it here.');
+  await expect(empty.locator('svg.lucide-file-x')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('empty-sidebar.png') });
+  await expect(navigation.locator('[data-sidebar="menu-button"]')).toHaveCount(0);
+  await expect(sidebar.getByRole('list', { name: 'Open-source credits' })).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Close sidebar' }).click();
+  await expect(page.getByRole('heading', { name: 'Saved graphs' })).not.toBeInViewport();
+  return { toggle, sidebar, navigation, empty };
+}
+
+async function expectPngExport(page: Page) {
+  const pngDownloadPromise = page.waitForEvent('download');
+
+  await selectDownload(page, 'PNG');
+
+  const pngDownload = await pngDownloadPromise;
+  const pngOutputPath = '.next/cache/playwright/export.png';
+
+  await pngDownload.saveAs(pngOutputPath);
+
+  const png = await readFile(pngOutputPath);
+  const pngSignature = Array.from(png.subarray(0, 4));
+
+  expect(pngDownload.suggestedFilename()).toBe('m2rd-graph.png');
+  expect(pngSignature).toEqual([0x89, 0x50, 0x4e, 0x47]);
+}
+
+async function expectStyledSvgExport(page: Page) {
+  const downloadPromise = page.waitForEvent('download');
+
+  await selectDownload(page, 'SVG');
+
+  const download = await downloadPromise;
+  const outputPath = '.next/cache/playwright/export.svg';
+
+  await download.saveAs(outputPath);
+
+  const svg = await readFile(outputPath, 'utf8');
+
+  expect(download.suggestedFilename()).toBe('m2rd-graph.svg');
+  expect(svg).toContain('<svg');
+  expect(svg).toContain('Write Mermaid');
+  expect(svg).toContain('rgb(239, 68, 68)');
+}
+
+async function expectRedactedInputEvent(page: Page) {
+  let consoleMessages: unknown[] = [];
+
+  page.on('console', (message) => {
+    const [firstArgument] = message.args();
+    const isInfo = message.type() === 'info';
+    const hasArgument = Boolean(firstArgument);
+    const shouldSkipMessage = !isInfo || !hasArgument;
+
+    if (shouldSkipMessage) {
+      return;
+    }
+
+    void firstArgument
+      .jsonValue()
+      .then((value) => {
+        const isObjectValue = value !== null && typeof value === 'object';
+
+        if (isObjectValue) {
+          consoleMessages = consoleMessages.concat(value);
+        }
+      })
+      .catch(() => {});
+  });
+
+  await page.goto('./');
+
+  await updateEditor(page);
+
+  await expect
+    .poll(() => consoleMessages)
+    .toContainEqual(
+      expect.objectContaining({
+        event: 'input.update',
+        msg: 'm2rd app event',
+        source: '[REDACTED]',
+      }),
+    );
+}
+
+async function resizePanelsWithPointer(
+  page: Page,
+  editor: Locator,
+  canvas: Locator,
+  handle: Locator,
+) {
+  const editorBefore = await getBounds(editor);
+  const canvasBefore = await getBounds(canvas);
+  const handleBefore = await getBounds(handle);
+  const x = handleBefore.x + handleBefore.width / 2;
+  const y = handleBefore.y + handleBefore.height / 2;
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 140, y, { steps: 12 });
+  await page.mouse.up();
+
+  const minimumEditorWidth = editorBefore.width + 100;
+  const maximumCanvasWidth = canvasBefore.width - 100;
+  await expect
+    .poll(async () => (await getBounds(editor)).width)
+    .toBeGreaterThan(minimumEditorWidth);
+  await expect.poll(async () => (await getBounds(canvas)).width).toBeLessThan(maximumCanvasWidth);
+}
+
+async function togglePanelFocusAndRestore(page: Page, panel: 'mermaid' | 'react-flow') {
+  const isMermaid = panel === 'mermaid';
+  const panelId = isMermaid ? 'mermaid-panel' : 'flow-panel';
+  const siblingId = isMermaid ? 'flow-panel' : 'mermaid-panel';
+  const panelLabel = isMermaid ? 'Mermaid input' : 'React Flow output';
+  const siblingLabel = isMermaid ? 'React Flow output' : 'Mermaid input';
+  const splitChevron = isMermaid ? 'right' : 'left';
+  const focusedChevron = isMermaid ? 'left' : 'right';
+  const selectedPanel = page.locator(`#${panelId}`);
+  const siblingPanel = page.locator(`#${siblingId}`);
+  const toggle = page.getByRole('button', { name: `Toggle focus for ${panelLabel} pane` });
+  await waitForPanelTransitions(page);
+  const selectedBefore = await getBounds(selectedPanel);
+  const siblingBefore = await getBounds(siblingPanel);
+
+  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${splitChevron}`));
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${focusedChevron}`));
+  await expect(page.getByRole('heading', { name: siblingLabel, exact: true })).toBeHidden();
+  await expect(siblingPanel).toHaveCSS('width', '0px');
+  await expect
+    .poll(async () => (await getBounds(selectedPanel)).width)
+    .toBeGreaterThan(selectedBefore.width + 100);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(toggle.locator('svg')).toHaveClass(new RegExp(`lucide-chevron-${splitChevron}`));
+  await waitForPanelTransitions(page);
+  await expect
+    .poll(async () => Math.abs((await getBounds(selectedPanel)).width - selectedBefore.width))
+    .toBeLessThan(2);
+  await expect
+    .poll(async () => Math.abs((await getBounds(siblingPanel)).width - siblingBefore.width))
+    .toBeLessThan(2);
+}
+
+async function waitForPanelTransitions(page: Page) {
+  await page.locator('#workspace-panels').evaluate(async (group) => {
+    const elements = [group, ...group.querySelectorAll('[data-panel]')];
+    const transitions = elements.flatMap((element) => element.getAnimations());
+    for (const transition of transitions) {
+      await transition.finished;
+    }
+  });
+}
+
+async function panCanvas(page: Page, deltaX: number) {
+  const pane = page.locator('.react-flow__pane');
+  const bounds = await getBounds(pane);
+  const startX = bounds.x + bounds.width - 16;
+  const startY = bounds.y + bounds.height - 16;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + deltaX, startY, { steps: 8 });
+  await page.mouse.up();
+}
+
+function writeLegacyRecords() {
+  return new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('m2rd');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction(['translations', 'workspaces'], 'readwrite');
+      const translations = transaction.objectStore('translations');
+      const workspaces = transaction.objectStore('workspaces');
+      const readTranslations = translations.getAll();
+      const readWorkspaces = workspaces.getAll();
+      readTranslations.onsuccess = () => {
+        const [translation] = readTranslations.result;
+        const settingsEntries = Object.entries(translation.settings);
+        const legacyEntries = settingsEntries.filter(([key]) => key !== 'edgeMarker');
+        const settings = Object.fromEntries(legacyEntries);
+        const [first, second] = translation.elements.edges;
+        const style = Object.assign({}, first.style, { stroke: '#a855f7', strokeWidth: 99 });
+        const edge = Object.assign({}, first, { markerEnd: { type: 'arrowclosed' }, style });
+        const elements = Object.assign({}, translation.elements, { edges: [edge, second] });
+        const legacy = Object.assign({}, translation, { elements, settings });
+        translations.put(legacy);
+      };
+      readWorkspaces.onsuccess = () => {
+        const [workspace] = readWorkspaces.result;
+        const legacy = Object.assign({}, workspace, { name: 'Untitled Graph' });
+        workspaces.put(legacy);
+      };
+      transaction.oncomplete = () => {
+        database.close();
+        resolve();
+      };
+      transaction.onabort = () => {
+        database.close();
+        reject(transaction.error);
+      };
+    };
+  });
+}
+
+function storeLegacyRecords(page: Page) {
+  return page.evaluate(writeLegacyRecords);
+}
+
+async function setGlobalMarkers(page: Page) {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('./');
+  await updateEditor(page);
+  const edges = page.locator('.react-flow__edge');
+  const firstEdge = edges.nth(0);
+  const secondEdge = edges.nth(1);
+  const width = page.getByRole('spinbutton', { name: 'Width' });
+  await expect(edges).toHaveCount(2);
+  await expect
+    .poll(() => readMarker(firstEdge))
+    .toEqual({ fill: 'rgb(23, 23, 23)', stroke: 'rgb(23, 23, 23)' });
+
+  await openToolkit(page);
+  await selectMarker(page, 'Open arrow');
+  await setColorInput(page.getByLabel('Color', { exact: true }), '#ef4444');
+  await page.getByRole('spinbutton', { name: 'Width' }).fill('99');
+  await expect(width).toHaveValue('8');
+  await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke-width', '8px');
+  await expect(secondEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke-width', '8px');
+  await expect
+    .poll(() => readMarker(firstEdge))
+    .toEqual({ fill: 'none', stroke: 'rgb(239, 68, 68)' });
+  await expect
+    .poll(() => readMarker(secondEdge))
+    .toEqual({ fill: 'none', stroke: 'rgb(239, 68, 68)' });
+  return { firstEdge, secondEdge, width };
+}
+
+async function verifyReloadedEdgeMarkers(page: Page, firstEdge: Locator, secondEdge: Locator) {
+  await page.reload();
+  await expect(firstEdge).toBeVisible();
+  await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Marker', exact: true })).toHaveText('None');
+  await expect.poll(() => readMarker(firstEdge)).toBeNull();
+  await expect(firstEdge.locator('.react-flow__edge-path')).toHaveCSS('stroke', 'rgb(34, 197, 94)');
+  await expect
+    .poll(() => readMarker(secondEdge))
+    .toEqual({ fill: 'none', stroke: 'rgb(239, 68, 68)' });
+  await selectMarker(page, 'Filled arrow');
+  await expect
+    .poll(() => readMarker(firstEdge))
+    .toEqual({ fill: 'rgb(34, 197, 94)', stroke: 'rgb(34, 197, 94)' });
+}
+
+async function saveUnnamedGraph(page: Page) {
+  let reactFlowWarnings: string[] = [];
+
+  page.on('console', (message) => {
+    const text = message.text();
+    const isReactFlowTypeMapWarning = text.includes(reactFlowTypeMapWarning);
+
+    if (!isReactFlowTypeMapWarning) {
+      return;
+    }
+
+    reactFlowWarnings = reactFlowWarnings.concat(text);
+  });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('./');
+  await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
+  expect(reactFlowWarnings).toHaveLength(0);
+  await page.keyboard.press('Escape');
+  const navigation = page.getByRole('navigation', { name: 'Saved graphs' });
+  const graphButtons = navigation.locator('[data-sidebar="menu-button"]');
+  const graphName = page.getByRole('button', { name: 'Rename graph', exact: true });
+  await expect(graphButtons).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(graphButtons).toHaveCount(1);
+  await expect(graphButtons).toHaveText(/^[a-f0-9-]{36}$/);
+  const savedId = await graphButtons.innerText();
+  await expect(graphName).toHaveText(savedId);
+  await page.reload();
+  await expect(graphName).toHaveText(savedId);
+  await graphName.click();
+  const titleInput = page.getByRole('textbox', { name: 'Graph name', exact: true });
+  await expect(titleInput).toHaveValue('');
+  await titleInput.press('Escape');
+  await expect(graphName).toHaveText(savedId);
+  return { navigation, graphButtons, graphName };
+}
+
+async function createRemainingVersions(page: Page, viewport: Locator, firstCamera: string) {
+  await editSnapshot(page, 2);
+  const node = page.locator('.react-flow__node[data-id="A"]');
+  await node.click();
+  await page.getByRole('button', { name: 'adj diagram' }).click();
+  await setColorInput(page.getByLabel('Fill'), '#22c55e');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'zoom in', exact: true }).click();
+  await expect(viewport).not.toHaveCSS('transform', firstCamera);
+  await saveSnapshot(page, 2);
+  await editSnapshot(page, 3);
+  await saveSnapshot(page, 3);
+  await editSnapshot(page, 4);
+  await saveSnapshot(page, 4);
+  await editSnapshot(page, 5);
+  await saveSnapshot(page, 5);
+  return node;
+}
+
+async function createStyledVersion(page: Page) {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('./');
+  await editSnapshot(page, 1);
+  await renameGraph(page, 'Versioned diagram');
+  await page.getByRole('button', { name: 'adj diagram' }).click();
+  await setColorInput(page.getByLabel('Fill'), '#ef4444');
+  await page.keyboard.press('Escape');
+  await saveSnapshot(page, 1);
+  const history = page.getByRole('region', { name: 'Version history' });
+  const workspaceButton = page.getByRole('button', { name: 'Versioned diagram' });
+  await expect(history).toBeVisible();
+  await expect(workspaceButton).toHaveAttribute('aria-expanded', 'true');
+  await workspaceButton.click();
+  await expect(history).not.toBeVisible();
+  await expect(workspaceButton).toHaveAttribute('aria-expanded', 'false');
+  await workspaceButton.click();
+  await expect(history).toBeVisible();
+  const viewport = page.locator('.react-flow__viewport');
+  const firstCamera = await viewport.evaluate((element) => getComputedStyle(element).transform);
+  return { history, viewport, firstCamera };
+}
+
+async function expectSidebarCredits(page: Page, header: Locator, sidebar: Locator) {
+  await expect(
+    sidebar.locator('[data-sidebar="header"]').getByText('m2rd', { exact: true }),
+  ).toBeVisible();
+  await expect(sidebar.getByRole('heading', { name: 'Saved graphs', exact: true })).toBeVisible();
+  const footer = sidebar.locator('[data-sidebar="footer"]');
+  await expect(footer.getByRole('link', { name: 'm2rd', exact: true })).toHaveAttribute(
+    'href',
+    repository.url,
+  );
+  await expect(
+    footer.getByText(
+      'm2rd currently supports flow, sequence, state, class, ER, and Gantt diagrams; more soon! made with:',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const footerMetadata = `v${version} · ${license} · ${new Date().getFullYear()}`;
+  await expect(footer.getByText(footerMetadata, { exact: true })).toBeVisible();
+  await expect(
+    header.getByRole('link', { name: 'GitHub repository', exact: true }),
+  ).toHaveAttribute('href', repository.url);
+  await expect(footer.getByRole('heading')).toHaveCount(0);
+  const credits = footer.getByRole('list', { name: 'Open-source credits' });
+  await expectThreeCreditLines(footer);
+  expect(
+    await credits
+      .getByRole('link')
+      .evaluateAll((links) => links.map((link) => [link.textContent, link.getAttribute('href')])),
+  ).toEqual([
+    ['Mermaid', 'https://mermaid.js.org/'],
+    ['React Flow', 'https://reactflow.dev/'],
+    ['XState', 'https://stately.ai/docs/xstate'],
+    ['Effect', 'https://effect.website/'],
+    ['shadcn/ui', 'https://ui.shadcn.com/'],
+    ['Codex', 'https://github.com/openai/codex'],
+    ['Tailwind CSS', 'https://tailwindcss.com/'],
+    ['Next.js', 'https://nextjs.org/'],
+    ['Dexie', 'https://dexie.org/'],
+  ]);
+}
+
+async function expectHeaderActions(page: Page, header: Locator) {
+  const names = await header
+    .getByRole('button')
+    .evaluateAll((buttons) =>
+      buttons.map((button) => button.getAttribute('aria-label') || button.textContent?.trim()),
+    );
+  expect(names).toEqual(['Toggle Sidebar', 'New', 'Rename graph', 'Save', 'Download', 'Delete']);
+  const actions = header.locator('button[aria-label]').filter({ has: page.locator('svg') });
+  await expect(actions).toHaveCount(3);
+  expect(await actions.allTextContents()).toEqual(['', '', '']);
+  const classes = await actions.evaluateAll((buttons) => buttons.map((button) => button.className));
+  expect(
+    classes.every((value) => {
+      const tokens = new Set(value.split(/\s+/));
+      const matches = !tokens.has('bg-background') && tokens.has('h-7') && tokens.has('w-7');
+      return matches;
+    }),
+  ).toBe(true);
+  await expect(header.getByRole('heading', { name: 'm2rd', exact: true })).toBeVisible();
+
+  const create = header.getByRole('button', { name: 'New', exact: true });
+  const sidebarTrigger = header.getByRole('button', { name: 'Toggle Sidebar' });
+  await expect(sidebarTrigger).toHaveCSS('width', '28px');
+  await expect(sidebarTrigger).toHaveCSS('height', '28px');
+  await expect(sidebarTrigger.locator('svg')).toHaveCSS('width', '16px');
+  await expect(sidebarTrigger.locator('svg')).toHaveCSS('height', '16px');
+  await create.hover();
+  await expect(page.getByRole('tooltip')).toHaveText('New');
+  await page.mouse.move(0, 0);
+  await create.focus();
+  await expect(page.getByRole('tooltip')).toHaveText('New');
+  const save = header.getByRole('button', { name: 'Save', exact: true });
+  await expect(save).toHaveText('save(⌃s / ⌘s)');
+  await expect(save).toHaveAttribute('aria-keyshortcuts', 'Control+s Meta+s');
+  await save.click();
+  await expect(header.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await header.getByRole('button', { name: 'Download', exact: true }).click();
+  await expect(page.getByRole('menuitem')).toHaveText(['SVG', 'PNG', 'GIF loop', 'GIF once']);
+  await page.keyboard.press('Escape');
+}
+
+async function createNewGraph(page: Page) {
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Sequence', exact: true }).click();
+}
+
+async function setColorInput(locator: Locator, value: string) {
+  await locator.evaluate((element, color) => {
+    const input = element as HTMLInputElement;
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+
+    descriptor?.set?.call(input, color);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
+async function getBounds(locator: Locator) {
+  const bounds = await locator.boundingBox();
+  expect(bounds).not.toBeNull();
+  return bounds!;
+}
+
+async function selectDownload(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Download', exact: true }).click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
+}
+
+async function selectMarker(page: Page, name: string) {
+  await page.getByRole('combobox', { name: 'Marker', exact: true }).click();
+  await page.getByRole('option', { name, exact: true }).click();
+}
+
+async function openToolkit(page: Page) {
+  const background = page.getByRole('combobox', { name: 'Background', exact: true });
+  const isOpen = await background.isVisible();
+  if (!isOpen) await page.getByRole('button', { name: 'adj diagram', exact: true }).click();
+  await expect(background).toBeVisible();
+}
+
+function readMarker(edge: Locator) {
+  return edge.locator('.react-flow__edge-path').evaluate((path) => {
+    const reference = path.getAttribute('marker-end') || '';
+    const id = reference.match(/#([^'")]+)/)?.[1];
+    const marker = id ? document.getElementById(id) : null;
+    const shape = marker?.querySelector('polyline');
+    if (!shape) {
+      return null;
+    }
+
+    const { fill, stroke } = getComputedStyle(shape);
+    return { fill, stroke };
+  });
+}
+
+async function saveSnapshot(page: Page, version: number) {
+  await page.getByRole('button', { name: /^(Save|Saved)$/ }).click();
+  const history = page.getByRole('region', { name: 'Version history' });
+  await expect(
+    history.getByRole('button', { name: new RegExp(`^v${version}\\b`) }),
+  ).toHaveAttribute('aria-pressed', 'true');
+}
+
+async function editSnapshot(page: Page, version: number) {
+  await updateEditor(page, versionSource(version));
+  await expect(
+    page.locator('.react-flow__node').filter({ hasText: `Snapshot ${version}` }),
+  ).toBeVisible();
+}
+
+function versionSource(version: number) {
+  return `flowchart LR\n  A[Snapshot ${version}] --> B[Saved graph]`;
+}
+
+async function updateEditor(page: Page, content = source) {
+  const editor = page.locator('.cm-content');
+
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.insertText(content);
+}
+
+async function saveNamedGraph(page: Page, name: string) {
+  await renameGraph(page, name);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+}
+
+async function renameGraph(page: Page, name: string) {
+  const title = page.getByRole('button', { name: 'Rename graph', exact: true });
+  await title.click();
+  const graphName = page.getByRole('textbox', { name: 'Graph name', exact: true });
+  await page.getByRole('textbox', { name: 'Graph name', exact: true }).fill(name);
+  await graphName.press('Enter');
+  await expect(title).toHaveText(name);
+}
+
+async function openSavedGraphs(page: Page) {
+  const navigation = page.getByRole('navigation', { name: 'Saved graphs' });
+  const heading = page.getByRole('heading', { name: 'Saved graphs', exact: true });
+  const isVisible = await heading.isVisible();
+  const collapsed = await page.locator('[data-state="collapsed"][data-side="left"]').count();
+  const shouldOpen = !isVisible || collapsed > 0;
+  if (shouldOpen) await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
+  await expect(heading).toBeInViewport();
+  return navigation;
+}
+
+async function expectThreeCreditLines(footer: Locator) {
+  const rows = footer
+    .getByRole('list', { name: 'Open-source credits' })
+    .locator(':scope > li > ul');
+  await expect(rows).toHaveCount(3);
+  const lineCounts = await rows.evaluateAll((elements) =>
+    elements.map((element) => {
+      const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
+      return element.getBoundingClientRect().height / lineHeight;
+    }),
+  );
+  expect(lineCounts).toEqual([1, 1, 1]);
+  await expect(rows.nth(0).getByRole('link')).toHaveText(['Mermaid', 'React Flow', 'XState']);
+  await expect(rows.nth(1).getByRole('link')).toHaveText(['Effect', 'shadcn/ui', 'Codex']);
+  await expect(rows.nth(2).getByRole('link')).toHaveText(['Tailwind CSS', 'Next.js', 'Dexie']);
+}
+
+async function createScrollableGraphList(page: Page) {
+  const names = Array.from({ length: 12 }, (_, index) => `Saved graph ${index + 1}`);
+  await names.reduce(async (previous, name, index) => {
+    await previous;
+    const needsNewGraph = index > 0;
+    if (needsNewGraph) await createNewGraph(page);
+    await saveNamedGraph(page, name);
+  }, Promise.resolve());
+}

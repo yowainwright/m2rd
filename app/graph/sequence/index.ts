@@ -31,43 +31,61 @@ import type { SequenceBounds, SequenceFrameRecord } from './types';
 import { createSequenceStyle, createEdgeStyle, createEdgeMarker } from '../utils';
 import { getText } from '../svg/utils';
 
-const getNumericAttribute = (element: Element, name: string, fallback: number) => {
-  const value = Number(element.getAttribute(name));
-  return Number.isFinite(value) ? value : fallback;
+export const parseSequenceSvg = (
+  svg: SVGSVGElement,
+  settings: TranslationSettings,
+): GraphElements => {
+  const participants = readSequenceParticipants(svg);
+  const height = getSequenceHeight(svg);
+  const messages = readSequenceMessages(svg, participants);
+  const handleMap = createParticipantHandleMap(messages);
+  const activationMap = readSequenceActivations(svg, participants);
+  const frameNodes: Node[] = readSequenceFrames(svg).map((frame) =>
+    createSequenceFrameNode(frame, settings),
+  );
+  const noteNodes: Node[] = readSequenceNotes(svg).map((note) =>
+    createSequenceNoteNode(note, settings),
+  );
+  const participantNodes: Node[] = participants.map((participant) =>
+    createSequenceNode({
+      participant,
+      height,
+      activations: activationMap.get(participant.id) || [],
+      handles: handleMap.get(participant.id) || [],
+      settings,
+    }),
+  );
+  const actionNodes = messages.map((message) => createSequenceActionNode(message, settings));
+  const edges = messages.flatMap((message) => [
+    createSequenceMessageEdge(message, 'source', settings),
+    createSequenceMessageEdge(message, 'target', settings),
+  ]);
+  return { nodes: frameNodes.concat(noteNodes, participantNodes, actionNodes), edges };
 };
 
-const getSequenceHeight = (svg: SVGSVGElement) => {
-  const values = (svg.getAttribute('viewBox') || '').split(/\s+/).map(Number);
-  const height = values[3];
-  const hasHeight = Number.isFinite(height) && height > 0;
-  if (hasHeight) return height;
-  return 320;
+const readSequenceFrames = (svg: SVGSVGElement) => {
+  return readSequenceRectFrames(svg)
+    .concat(readSequenceControlFrames(svg))
+    .sort((first, second) => first.y - second.y);
 };
 
-const readSequenceLifeLines = (svg: SVGSVGElement) => {
-  const lines = Array.from(svg.querySelectorAll('line[data-et="life-line"]'));
-  return new Map(lines.map((line) => [line.getAttribute('data-id') || '', line]));
-};
-
-const readSequenceParticipants = (svg: SVGSVGElement) => {
-  const lifeLines = readSequenceLifeLines(svg);
-  return Array.from(svg.querySelectorAll('[data-et="participant"]'))
-    .map((participant): SequenceParticipantRecord | null => {
-      const id = participant.getAttribute('data-id');
-      const rect = participant.querySelector('rect.actor-top');
-      if (!id) return null;
-      const lifeLine = lifeLines.get(id);
-      const hasGeometry = Boolean(rect) || Boolean(lifeLine);
-      if (!hasGeometry) return null;
-      const label = getText(participant, 'text') || id;
-      const width = rect ? getNumericAttribute(rect, 'width', 150) : SEQUENCE_ACTOR_FIGURE_WIDTH;
-      const lineCenter = lifeLine ? getNumericAttribute(lifeLine, 'x1', 0) : 0;
-      const center = rect ? getNumericAttribute(rect, 'x', 0) + width / 2 : lineCenter;
-      const x = rect ? getNumericAttribute(rect, 'x', 0) : center - width / 2;
-      return { id, label, width, x };
-    })
-    .filter((participant): participant is SequenceParticipantRecord => participant !== null)
-    .sort((first, second) => first.x - second.x);
+const readSequenceControlFrames = (svg: SVGSVGElement): SequenceFrameRecord[] => {
+  const frames = Array.from(svg.querySelectorAll('g[data-et="control-structure"]')).map(
+    (group, index) => {
+      const bounds = readSequenceBounds(Array.from(group.querySelectorAll('.loopLine')));
+      if (!bounds) return null;
+      const sections = readSequenceSections(group, bounds);
+      const frameType = getSequenceFrameType(getText(group, '.labelText'));
+      const id = group.getAttribute('data-id') || `control-${index}`;
+      return Object.assign({}, bounds, {
+        frameType,
+        id: `frame-${id}`,
+        label: getText(group, '.loopText'),
+        sections,
+      });
+    },
+  );
+  return frames.filter((frame): frame is SequenceFrameRecord => frame !== null);
 };
 
 const readSequenceBounds = (lines: Element[]): SequenceBounds | null => {
@@ -100,31 +118,6 @@ const readSequenceSections = (group: Element, bounds: SequenceBounds) => {
   }));
 };
 
-const readSequenceControlFrames = (svg: SVGSVGElement): SequenceFrameRecord[] => {
-  const frames = Array.from(svg.querySelectorAll('g[data-et="control-structure"]')).map(
-    (group, index) => {
-      const bounds = readSequenceBounds(Array.from(group.querySelectorAll('.loopLine')));
-      if (!bounds) return null;
-      const sections = readSequenceSections(group, bounds);
-      const frameType = getSequenceFrameType(getText(group, '.labelText'));
-      const id = group.getAttribute('data-id') || `control-${index}`;
-      return Object.assign({}, bounds, {
-        frameType,
-        id: `frame-${id}`,
-        label: getText(group, '.loopText'),
-        sections,
-      });
-    },
-  );
-  return frames.filter((frame): frame is SequenceFrameRecord => frame !== null);
-};
-
-const readSequenceRectFill = (rect: Element) => {
-  const fill = rect.getAttribute('fill');
-  if (fill === 'transparent') return undefined;
-  return fill || undefined;
-};
-
 const readSequenceRectFrames = (svg: SVGSVGElement): SequenceFrameRecord[] => {
   return Array.from(svg.querySelectorAll('rect.rect')).map((rect, index) => ({
     fill: readSequenceRectFill(rect),
@@ -139,10 +132,10 @@ const readSequenceRectFrames = (svg: SVGSVGElement): SequenceFrameRecord[] => {
   }));
 };
 
-const readSequenceFrames = (svg: SVGSVGElement) => {
-  return readSequenceRectFrames(svg)
-    .concat(readSequenceControlFrames(svg))
-    .sort((first, second) => first.y - second.y);
+const readSequenceRectFill = (rect: Element) => {
+  const fill = rect.getAttribute('fill');
+  if (fill === 'transparent') return undefined;
+  return fill || undefined;
 };
 
 const readSequenceNotes = (svg: SVGSVGElement) => {
@@ -160,17 +153,6 @@ const readSequenceNotes = (svg: SVGSVGElement) => {
   });
 };
 
-const readSequenceActivation = (rect: Element, participants: SequenceParticipantRecord[]) => {
-  const x = getNumericAttribute(rect, 'x', 0);
-  const y = getNumericAttribute(rect, 'y', 0);
-  const width = getNumericAttribute(rect, 'width', 0);
-  const height = getNumericAttribute(rect, 'height', 0);
-  const participant = getNearestParticipant(participants, x + width / 2);
-  if (!participant) return null;
-  const activation = { height, width, x: x - participant.x, y };
-  return [participant.id, activation] as const;
-};
-
 const readSequenceActivations = (svg: SVGSVGElement, participants: SequenceParticipantRecord[]) => {
   const entries = Array.from(svg.querySelectorAll('rect[class^="activation"]')).flatMap((rect) => {
     const entry = readSequenceActivation(rect, participants);
@@ -185,38 +167,15 @@ const readSequenceActivations = (svg: SVGSVGElement, participants: SequenceParti
   return new Map(activations);
 };
 
-const getPathStart = (element: Element) => {
-  const path = element.getAttribute('d') || '';
-  const match = path.match(/M\s*([\d.-]+)[,\s]+([\d.-]+)/);
-  if (!match) return null;
-  return { x: Number(match[1]), y: Number(match[2]) };
-};
-
-const readSequenceMessagePoint = (element: Element): SequenceMessagePoint | null => {
-  const lineStart = element.getAttribute('x1');
-  const lineEnd = element.getAttribute('x2');
-  const hasLinePoints = lineStart !== null && lineEnd !== null;
-  if (hasLinePoints) {
-    const sourceX = Number(lineStart);
-    const targetX = Number(lineEnd);
-    const y = getNumericAttribute(element, 'y1', 0);
-    return { sourceX, targetX, y };
-  }
-
-  const pathStart = getPathStart(element);
-  if (!pathStart) return null;
-  return { sourceX: pathStart.x, targetX: pathStart.x, y: pathStart.y };
-};
-
-const getNearestParticipant = (participants: SequenceParticipantRecord[], x: number) => {
-  return participants.reduce<SequenceParticipantRecord | null>((nearest, participant) => {
-    const center = participant.x + participant.width / 2;
-    let nearestDistance = Infinity;
-    if (nearest) nearestDistance = Math.abs(nearest.x + nearest.width / 2 - x);
-    const isCloser = Math.abs(center - x) < nearestDistance;
-    if (isCloser) return participant;
-    return nearest;
-  }, null);
+const readSequenceActivation = (rect: Element, participants: SequenceParticipantRecord[]) => {
+  const x = getNumericAttribute(rect, 'x', 0);
+  const y = getNumericAttribute(rect, 'y', 0);
+  const width = getNumericAttribute(rect, 'width', 0);
+  const height = getNumericAttribute(rect, 'height', 0);
+  const participant = getNearestParticipant(participants, x + width / 2);
+  if (!participant) return null;
+  const activation = { height, width, x: x - participant.x, y };
+  return [participant.id, activation] as const;
 };
 
 const createSequenceNode = ({
@@ -255,37 +214,6 @@ const createSequenceNode = ({
   };
 };
 
-const getParticipantCenter = (participant: SequenceParticipantRecord) => {
-  const halfWidth = participant.width / 2;
-  return participant.x + halfWidth;
-};
-
-const getActionCenter = (message: SequenceMessageRecord) => {
-  const sourceCenter = getParticipantCenter(message.source);
-  const targetCenter = getParticipantCenter(message.target);
-  if (sourceCenter === targetCenter) return sourceCenter + SEQUENCE_SELF_MESSAGE_OFFSET;
-  const midpoint = sourceCenter + targetCenter;
-  return midpoint / 2;
-};
-
-const getActionWidth = (label: string, sequenceNumber?: string) => {
-  const content = [sequenceNumber, label].filter(Boolean).join(' ');
-  const estimatedWidth = content.length * 8 + 16;
-  return Math.max(SEQUENCE_ACTION_NODE_MIN_WIDTH, estimatedWidth);
-};
-
-const getParticipantHandleSide = (participant: SequenceParticipantRecord, actionCenter: number) => {
-  const participantCenter = getParticipantCenter(participant);
-  if (participantCenter < actionCenter) return 'right';
-  return 'left';
-};
-
-const getActionHandleSide = (participant: SequenceParticipantRecord, actionCenter: number) => {
-  const participantCenter = getParticipantCenter(participant);
-  if (participantCenter < actionCenter) return 'left';
-  return 'right';
-};
-
 const createMessageHandleEntries = (message: SequenceMessageRecord) => {
   const isSelfMessage = message.source.id === message.target.id;
   const sourceY = message.point.y;
@@ -297,12 +225,6 @@ const createMessageHandleEntries = (message: SequenceMessageRecord) => {
   return [source, target];
 };
 
-const createParticipantHandles = (
-  entries: ReadonlyArray<readonly [string, SequenceParticipantHandle]>,
-) => {
-  return entries.map(([, handle]) => handle);
-};
-
 const createParticipantHandleMap = (messages: SequenceMessageRecord[]) => {
   const entries = messages.flatMap(createMessageHandleEntries);
   const groups = EffectArray.groupBy(entries, ([id]) => `participant:${id}`);
@@ -312,6 +234,12 @@ const createParticipantHandleMap = (messages: SequenceMessageRecord[]) => {
     return [id, participantHandles] as const;
   });
   return new Map(handles);
+};
+
+const createParticipantHandles = (
+  entries: ReadonlyArray<readonly [string, SequenceParticipantHandle]>,
+) => {
+  return entries.map(([, handle]) => handle);
 };
 
 const createSequenceActionNode = (
@@ -336,6 +264,12 @@ const createSequenceActionNode = (
     style: { height: SEQUENCE_ACTION_NODE_HEIGHT, width },
     type: SEQUENCE_ACTION_NODE_TYPE,
   };
+};
+
+const getActionWidth = (label: string, sequenceNumber?: string) => {
+  const content = [sequenceNumber, label].filter(Boolean).join(' ');
+  const estimatedWidth = content.length * 8 + 16;
+  return Math.max(SEQUENCE_ACTION_NODE_MIN_WIDTH, estimatedWidth);
 };
 
 const createSequenceNoteNode = (
@@ -375,6 +309,144 @@ const createSequenceFrameNode = (
     type: SEQUENCE_FRAME_NODE_TYPE,
     zIndex: -1,
   };
+};
+
+const createSequenceMessageEdge = (
+  message: SequenceMessageRecord,
+  segment: SequenceMessageData['segment'],
+  settings: TranslationSettings,
+): Edge<SequenceMessageData> => {
+  const isSourceSegment = segment === 'source';
+  const participant = isSourceSegment ? message.source : message.target;
+  const actionCenter = getActionCenter(message);
+  const participantSide = getParticipantHandleSide(participant, actionCenter);
+  const actionSide = getActionHandleSide(participant, actionCenter);
+  const data = createSequenceMessageData(message, segment);
+  const { markerEnd, markerStart } = data;
+  return {
+    data,
+    id: `${message.id}-${segment}`,
+    markerEnd: markerEnd ? createEdgeMarker(settings.edgeMarker, settings.edgeColor) : undefined,
+    markerStart: markerStart
+      ? createEdgeMarker(settings.edgeMarker, settings.edgeColor)
+      : undefined,
+    source: isSourceSegment ? message.source.id : message.actionId,
+    sourceHandle: isSourceSegment
+      ? getParticipantHandleId(message.id, 'source', participantSide)
+      : getActionHandleId('source', actionSide),
+    style: createEdgeStyle(settings),
+    target: isSourceSegment ? message.actionId : message.target.id,
+    targetHandle: isSourceSegment
+      ? getActionHandleId('target', actionSide)
+      : getParticipantHandleId(message.id, 'target', participantSide),
+    type: SEQUENCE_MESSAGE_EDGE_TYPE,
+  };
+};
+
+const getActionHandleSide = (participant: SequenceParticipantRecord, actionCenter: number) => {
+  const participantCenter = getParticipantCenter(participant);
+  if (participantCenter < actionCenter) return 'left';
+  return 'right';
+};
+
+const getParticipantHandleId = (messageId: string, type: 'source' | 'target', side: string) => {
+  return `${messageId}-${type}-${side}`;
+};
+
+const getActionHandleId = (type: 'source' | 'target', side: string) => {
+  return `${side}-${type}`;
+};
+
+const createSequenceMessageData = (
+  message: SequenceMessageRecord,
+  segment: SequenceMessageData['segment'],
+): SequenceMessageData => {
+  const isSourceSegment = segment === 'source';
+  const hasMermaidMarker = message.markerStart || message.markerEnd;
+  const hasEndMarker = !hasMermaidMarker || message.markerEnd;
+  const markerEnd = !isSourceSegment && hasEndMarker;
+  const markerStart = isSourceSegment && message.markerStart;
+  return {
+    dashed: message.dashed,
+    kind: 'sequence-message',
+    markerEnd,
+    markerStart,
+    messageY: message.point.y,
+    segment,
+    selfMessage: message.source.id === message.target.id,
+    sequenceNumber: isSourceSegment ? message.sequenceNumber : undefined,
+  };
+};
+
+const getParticipantHandleSide = (participant: SequenceParticipantRecord, actionCenter: number) => {
+  const participantCenter = getParticipantCenter(participant);
+  if (participantCenter < actionCenter) return 'right';
+  return 'left';
+};
+
+const getActionCenter = (message: SequenceMessageRecord) => {
+  const sourceCenter = getParticipantCenter(message.source);
+  const targetCenter = getParticipantCenter(message.target);
+  if (sourceCenter === targetCenter) return sourceCenter + SEQUENCE_SELF_MESSAGE_OFFSET;
+  const midpoint = sourceCenter + targetCenter;
+  return midpoint / 2;
+};
+
+const getParticipantCenter = (participant: SequenceParticipantRecord) => {
+  const halfWidth = participant.width / 2;
+  return participant.x + halfWidth;
+};
+
+const readSequenceMessages = (svg: SVGSVGElement, participants: SequenceParticipantRecord[]) => {
+  const participantEntries = participants.map(
+    (participant) => [participant.id, participant] as const,
+  );
+  const participantsById = new Map(participantEntries);
+  const messageElements = Array.from(svg.querySelectorAll('[data-et="message"]'));
+  const labels = Array.from(svg.querySelectorAll('.messageText')).map(
+    (message) => message.textContent?.trim() || '',
+  );
+  const sequenceNumbers = Array.from(svg.querySelectorAll('.sequenceNumber')).map(
+    (number) => number.textContent?.trim() || '',
+  );
+  return messageElements.flatMap((element, index) => {
+    const point = readSequenceMessagePoint(element);
+    if (!point) return [];
+    return [
+      createSequenceMessageRecord({
+        element,
+        label: labels[index] || '',
+        index,
+        participants,
+        participantsById,
+        point,
+        sequenceNumber: sequenceNumbers[index],
+      }),
+    ];
+  });
+};
+
+const readSequenceMessagePoint = (element: Element): SequenceMessagePoint | null => {
+  const lineStart = element.getAttribute('x1');
+  const lineEnd = element.getAttribute('x2');
+  const hasLinePoints = lineStart !== null && lineEnd !== null;
+  if (hasLinePoints) {
+    const sourceX = Number(lineStart);
+    const targetX = Number(lineEnd);
+    const y = getNumericAttribute(element, 'y1', 0);
+    return { sourceX, targetX, y };
+  }
+
+  const pathStart = getPathStart(element);
+  if (!pathStart) return null;
+  return { sourceX: pathStart.x, targetX: pathStart.x, y: pathStart.y };
+};
+
+const getPathStart = (element: Element) => {
+  const path = element.getAttribute('d') || '';
+  const match = path.match(/M\s*([\d.-]+)[,\s]+([\d.-]+)/);
+  if (!match) return null;
+  return { x: Number(match[1]), y: Number(match[2]) };
 };
 
 const createSequenceMessageRecord = ({
@@ -417,124 +489,52 @@ const createSequenceMessageRecord = ({
   };
 };
 
-const getParticipantHandleId = (messageId: string, type: 'source' | 'target', side: string) => {
-  return `${messageId}-${type}-${side}`;
+const getNearestParticipant = (participants: SequenceParticipantRecord[], x: number) => {
+  return participants.reduce<SequenceParticipantRecord | null>((nearest, participant) => {
+    const center = participant.x + participant.width / 2;
+    let nearestDistance = Infinity;
+    if (nearest) nearestDistance = Math.abs(nearest.x + nearest.width / 2 - x);
+    const isCloser = Math.abs(center - x) < nearestDistance;
+    if (isCloser) return participant;
+    return nearest;
+  }, null);
 };
 
-const getActionHandleId = (type: 'source' | 'target', side: string) => {
-  return `${side}-${type}`;
+const getSequenceHeight = (svg: SVGSVGElement) => {
+  const values = (svg.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+  const height = values[3];
+  const hasHeight = Number.isFinite(height) && height > 0;
+  if (hasHeight) return height;
+  return 320;
 };
 
-const createSequenceMessageData = (
-  message: SequenceMessageRecord,
-  segment: SequenceMessageData['segment'],
-): SequenceMessageData => {
-  const isSourceSegment = segment === 'source';
-  const hasMermaidMarker = message.markerStart || message.markerEnd;
-  const hasEndMarker = !hasMermaidMarker || message.markerEnd;
-  const markerEnd = !isSourceSegment && hasEndMarker;
-  const markerStart = isSourceSegment && message.markerStart;
-  return {
-    dashed: message.dashed,
-    kind: 'sequence-message',
-    markerEnd,
-    markerStart,
-    messageY: message.point.y,
-    segment,
-    selfMessage: message.source.id === message.target.id,
-    sequenceNumber: isSourceSegment ? message.sequenceNumber : undefined,
-  };
+const readSequenceParticipants = (svg: SVGSVGElement) => {
+  const lifeLines = readSequenceLifeLines(svg);
+  return Array.from(svg.querySelectorAll('[data-et="participant"]'))
+    .map((participant): SequenceParticipantRecord | null => {
+      const id = participant.getAttribute('data-id');
+      const rect = participant.querySelector('rect.actor-top');
+      if (!id) return null;
+      const lifeLine = lifeLines.get(id);
+      const hasGeometry = Boolean(rect) || Boolean(lifeLine);
+      if (!hasGeometry) return null;
+      const label = getText(participant, 'text') || id;
+      const width = rect ? getNumericAttribute(rect, 'width', 150) : SEQUENCE_ACTOR_FIGURE_WIDTH;
+      const lineCenter = lifeLine ? getNumericAttribute(lifeLine, 'x1', 0) : 0;
+      const center = rect ? getNumericAttribute(rect, 'x', 0) + width / 2 : lineCenter;
+      const x = rect ? getNumericAttribute(rect, 'x', 0) : center - width / 2;
+      return { id, label, width, x };
+    })
+    .filter((participant): participant is SequenceParticipantRecord => participant !== null)
+    .sort((first, second) => first.x - second.x);
 };
 
-const createSequenceMessageEdge = (
-  message: SequenceMessageRecord,
-  segment: SequenceMessageData['segment'],
-  settings: TranslationSettings,
-): Edge<SequenceMessageData> => {
-  const isSourceSegment = segment === 'source';
-  const participant = isSourceSegment ? message.source : message.target;
-  const actionCenter = getActionCenter(message);
-  const participantSide = getParticipantHandleSide(participant, actionCenter);
-  const actionSide = getActionHandleSide(participant, actionCenter);
-  const data = createSequenceMessageData(message, segment);
-  const { markerEnd, markerStart } = data;
-  return {
-    data,
-    id: `${message.id}-${segment}`,
-    markerEnd: markerEnd ? createEdgeMarker(settings.edgeMarker, settings.edgeColor) : undefined,
-    markerStart: markerStart
-      ? createEdgeMarker(settings.edgeMarker, settings.edgeColor)
-      : undefined,
-    source: isSourceSegment ? message.source.id : message.actionId,
-    sourceHandle: isSourceSegment
-      ? getParticipantHandleId(message.id, 'source', participantSide)
-      : getActionHandleId('source', actionSide),
-    style: createEdgeStyle(settings),
-    target: isSourceSegment ? message.actionId : message.target.id,
-    targetHandle: isSourceSegment
-      ? getActionHandleId('target', actionSide)
-      : getParticipantHandleId(message.id, 'target', participantSide),
-    type: SEQUENCE_MESSAGE_EDGE_TYPE,
-  };
+const getNumericAttribute = (element: Element, name: string, fallback: number) => {
+  const value = Number(element.getAttribute(name));
+  return Number.isFinite(value) ? value : fallback;
 };
 
-const readSequenceMessages = (svg: SVGSVGElement, participants: SequenceParticipantRecord[]) => {
-  const participantEntries = participants.map(
-    (participant) => [participant.id, participant] as const,
-  );
-  const participantsById = new Map(participantEntries);
-  const messageElements = Array.from(svg.querySelectorAll('[data-et="message"]'));
-  const labels = Array.from(svg.querySelectorAll('.messageText')).map(
-    (message) => message.textContent?.trim() || '',
-  );
-  const sequenceNumbers = Array.from(svg.querySelectorAll('.sequenceNumber')).map(
-    (number) => number.textContent?.trim() || '',
-  );
-  return messageElements.flatMap((element, index) => {
-    const point = readSequenceMessagePoint(element);
-    if (!point) return [];
-    return [
-      createSequenceMessageRecord({
-        element,
-        label: labels[index] || '',
-        index,
-        participants,
-        participantsById,
-        point,
-        sequenceNumber: sequenceNumbers[index],
-      }),
-    ];
-  });
-};
-
-export const parseSequenceSvg = (
-  svg: SVGSVGElement,
-  settings: TranslationSettings,
-): GraphElements => {
-  const participants = readSequenceParticipants(svg);
-  const height = getSequenceHeight(svg);
-  const messages = readSequenceMessages(svg, participants);
-  const handleMap = createParticipantHandleMap(messages);
-  const activationMap = readSequenceActivations(svg, participants);
-  const frameNodes: Node[] = readSequenceFrames(svg).map((frame) =>
-    createSequenceFrameNode(frame, settings),
-  );
-  const noteNodes: Node[] = readSequenceNotes(svg).map((note) =>
-    createSequenceNoteNode(note, settings),
-  );
-  const participantNodes: Node[] = participants.map((participant) =>
-    createSequenceNode({
-      participant,
-      height,
-      activations: activationMap.get(participant.id) || [],
-      handles: handleMap.get(participant.id) || [],
-      settings,
-    }),
-  );
-  const actionNodes = messages.map((message) => createSequenceActionNode(message, settings));
-  const edges = messages.flatMap((message) => [
-    createSequenceMessageEdge(message, 'source', settings),
-    createSequenceMessageEdge(message, 'target', settings),
-  ]);
-  return { nodes: frameNodes.concat(noteNodes, participantNodes, actionNodes), edges };
+const readSequenceLifeLines = (svg: SVGSVGElement) => {
+  const lines = Array.from(svg.querySelectorAll('line[data-et="life-line"]'));
+  return new Map(lines.map((line) => [line.getAttribute('data-id') || '', line]));
 };
