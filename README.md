@@ -1,6 +1,8 @@
 # m2rd
 
-[![Test](https://github.com/yowainwright/m2rd/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/yowainwright/m2rd/actions/workflows/test.yml)
+<!-- Workflow badges from .github/workflows/test.yml and .github/workflows/gh-pages.yml -->
+
+[![PR checks](https://github.com/yowainwright/m2rd/actions/workflows/test.yml/badge.svg?event=pull_request)](https://github.com/yowainwright/m2rd/actions/workflows/test.yml)
 [![Deploy GitHub Pages](https://github.com/yowainwright/m2rd/actions/workflows/gh-pages.yml/badge.svg?branch=main)](https://github.com/yowainwright/m2rd/actions/workflows/gh-pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 

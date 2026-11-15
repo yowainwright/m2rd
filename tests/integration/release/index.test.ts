@@ -11,10 +11,12 @@ const block = workflow.match(
 );
 if (!block) throw new Error('Release revision step is missing');
 const script = block[1].replace(/^ {10}/gm, '');
-const gitStub = `git() {
+const gitStub = `jq() { return 127; }
+git() {
   case "$1" in
     log) printf '%s' "$MOCK_RELEASE" ;;
     rev-parse) printf '%s' "$MOCK_HEAD" ;;
+    show) printf '%s' '{"version":"0.0.18"}' ;;
     *) return 1 ;;
   esac
 }`;
@@ -54,7 +56,7 @@ test('queues a patch for a new main push using the revision that checks will val
 test('reuses the recorded release on a retry without bumping again', () => {
   expect(resolveRevision('push', 'release-sha', 'release-sha')).toEqual({
     status: 0,
-    output: 'sha=release-sha\nbump=false\n',
+    output: 'sha=release-sha\nbump=false\ntag=v0.0.18\n',
   });
 });
 

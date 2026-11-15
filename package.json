@@ -181,9 +181,6 @@
     }
   },
   "pastoralist": {
-    "security": {
-      "severityThreshold": "medium"
-    },
     "appendix": {
       "lodash-es@4.18.1": {
         "dependents": {
@@ -347,6 +344,9 @@
           "confidence": "possible"
         }
       }
+    },
+    "security": {
+      "severityThreshold": "medium"
     }
   },
   "peerDependencies": {},
