@@ -1,6 +1,6 @@
 import { Array as EffectArray } from 'effect';
 import mermaid from 'mermaid';
-import mermaidMetadata from 'mermaid/package.json';
+import mermaidMetadata from 'mermaid/package.json' with { type: 'json' };
 import type { Edge, Node } from 'reactflow';
 import type { GraphElements, TranslationSettings } from '../types';
 import type { StateHandle } from '../state/types';

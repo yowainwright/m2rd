@@ -7,6 +7,8 @@ import type { GraphRecords, GraphRenderResult, GraphWorkspace } from '@/app/grap
 import type { GraphExportResult } from '@/app/export';
 import type { AppContext, LoadedWorkspace } from '@/app/types';
 import type { SavedWorkspace } from '@/app/state/types';
+import { graphRepository } from '@/app/graph';
+import { remoteDrafts, rememberRemoteSnapshot } from '@/app/graph/repository';
 
 const rendered: GraphRenderResult = {
   diagramType: 'flowchart',
@@ -178,4 +180,84 @@ it('reports export failures and returns the export branch to idle', async () => 
   actor.send({ type: 'export.start', request: { format: 'svg', repeat: 'forever' } });
   await vi.waitFor(() => expect(actor.getSnapshot().context.exportError).toBe('export failed'));
   expect(actor.getSnapshot().matches({ exporting: 'idle' })).toBe(true);
+});
+
+it('restores persisted sharing metadata and the same pending save after switching workspaces', async () => {
+  const saved = await graphRepository.create(records);
+  const saveId = crypto.randomUUID();
+  const draft = { saveId, workspaceId: saved.workspace.id, snapshot: '{}', reconcileOnly: true };
+  const shared = {
+    gistId: 'ab',
+    revision: 'a'.repeat(40),
+    fileName: 'snapshot',
+    url: 'https://example.com',
+  };
+  await remoteDrafts.put(draft);
+  await rememberRemoteSnapshot(saved.workspace.id, shared);
+  try {
+    const actor = startActor();
+    await waitUntilReady(actor);
+    actor.send({ type: 'workspace.load', request: { workspaceId: saved.workspace.id } });
+    await waitUntilReady(actor);
+    expect(actor.getSnapshot().context.remoteDraft).toEqual(draft);
+    expect(actor.getSnapshot().context.remote).toEqual(shared);
+    actor.send({ type: 'workspace.create' });
+    await waitUntilReady(actor);
+    expect(actor.getSnapshot().context.remoteDraft).toBeNull();
+    actor.send({ type: 'workspace.load', request: { workspaceId: saved.workspace.id } });
+    await waitUntilReady(actor);
+    expect(actor.getSnapshot().context.remoteDraft?.saveId).toBe(saveId);
+  } finally {
+    await graphRepository.delete(saved.workspace.id);
+    await remoteDrafts.delete(saveId);
+  }
+});
+
+it('reports a broken shared link when the visitor has no local workspace', async () => {
+  const initialize = fromPromise<LoadedWorkspace>(() =>
+    Promise.resolve({
+      records: null,
+      workspaces: [],
+      sharedError: 'This saved graph is unavailable.',
+    }),
+  );
+  const actor = startActor({ initialize });
+  await waitUntilReady(actor);
+  expect(actor.getSnapshot().context.remoteError).toBe('This saved graph is unavailable.');
+  expect(actor.getSnapshot().context.operationError).toBe('This saved graph is unavailable.');
+  expect(actor.getSnapshot().context.errorDialogDismissed).toBe(false);
+});
+
+it('keeps the pending save on cancel and discards only that save after confirmation', async () => {
+  const saveId = crypto.randomUUID();
+  const pending = {
+    saveId,
+    workspaceId: records.workspace.id,
+    snapshot: '{}',
+    reconcileOnly: true,
+  };
+  await remoteDrafts.put(pending);
+  try {
+    const initialize = fromPromise<LoadedWorkspace>(() =>
+      Promise.resolve({ records, workspaces: [records.workspace], pending }),
+    );
+    const actor = startActor({ initialize });
+    await waitUntilReady(actor);
+    actor.send({ type: 'input.update', source: 'flowchart LR; Keep --> Edits' });
+    await waitUntilReady(actor);
+    actor.send({ type: 'remote.discard' });
+    expect(actor.getSnapshot().matches({ remote: 'confirmingDiscard' })).toBe(true);
+    expect(actor.getSnapshot().can({ type: 'workspace.create' })).toBe(false);
+    actor.send({ type: 'remote.discard.cancel' });
+    expect(actor.getSnapshot().context.remoteDraft).toEqual(pending);
+    expect(await remoteDrafts.get(saveId)).toEqual(pending);
+    actor.send({ type: 'remote.discard' });
+    actor.send({ type: 'remote.discard.confirm' });
+    await vi.waitFor(() => expect(actor.getSnapshot().context.remoteDraft).toBeNull());
+    expect(await remoteDrafts.get(saveId)).toBeUndefined();
+    expect(actor.getSnapshot().context.input.source).toBe('flowchart LR; Keep --> Edits');
+    expect(actor.getSnapshot().can({ type: 'remote.save' })).toBe(true);
+  } finally {
+    await remoteDrafts.delete(saveId);
+  }
 });

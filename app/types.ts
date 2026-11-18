@@ -1,3 +1,4 @@
+import type { SnapshotLink, SnapshotProvenance } from '@/app/graph/snapshot';
 import type { ReactNode } from 'react';
 import type { EdgeChange, NodeChange, Viewport } from 'reactflow';
 import type { GifExportRepeat } from '@/app/export';
@@ -19,6 +20,19 @@ export type WorkspaceOperation =
   | { type: 'workspace.load'; request: WorkspaceRequest }
   | { type: 'workspace.delete' };
 export type ExportRequest = { format: 'svg' | 'png' | 'gif'; repeat: GifExportRepeat };
+export type RemoteSnapshot = SnapshotProvenance & { url: string };
+export type RemoteDraft = {
+  saveId: string;
+  workspaceId: string;
+  snapshot: string;
+  target?: SnapshotLink;
+  forkId?: string;
+  reconcileOnly?: boolean;
+};
+export type SharedSnapshot = RemoteSnapshot & { forkedFrom?: SnapshotProvenance; svg?: string };
+export type AccountSnapshot = Pick<RemoteSnapshot, 'gistId' | 'revision' | 'url'> & {
+  title: string;
+};
 export type AppContext = {
   isDesktop: boolean | null;
   mermaidPanelCollapsed: boolean;
@@ -39,6 +53,11 @@ export type AppContext = {
   viewportHistory: Viewport[];
   viewportForwardHistory: Viewport[];
   exportRequest: ExportRequest;
+  remote: SharedSnapshot | null;
+  remoteDraft: RemoteDraft | null;
+  remoteAccount: string | null;
+  remoteError: string | null;
+  accountSnapshots: AccountSnapshot[];
   input: GraphInput;
   translation: GraphTranslation;
   workspace: GraphWorkspace;
@@ -48,6 +67,16 @@ export type AppContext = {
 
 export type AppEvent =
   | WorkspaceOperation
+  | { type: 'remote.account' }
+  | { type: 'remote.save' }
+  | { type: 'remote.resume' }
+  | { type: 'remote.authorize' }
+  | { type: 'remote.discard' }
+  | { type: 'remote.discard.confirm' }
+  | { type: 'remote.discard.cancel' }
+  | { type: 'remote.signOut' }
+  | { type: 'remote.copy' }
+  | { type: 'remote.list' }
   | { type: 'layout.update'; isDesktop: boolean }
   | { type: 'layout.panel.update'; panel: 'mermaid' | 'react-flow'; collapsed: boolean }
   | { type: 'sidebar.update'; open: boolean }
@@ -73,6 +102,10 @@ export type AppEvent =
 
 export type LoadedWorkspace = {
   records: GraphRecords | null;
+  shared?: SharedSnapshot;
+  pending?: RemoteDraft;
+  resumePending?: boolean;
+  sharedError?: string;
   workspaces: GraphWorkspace[];
 };
 export type ReactFlowErrorHandler = (code: string, message: string) => void;

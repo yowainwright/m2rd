@@ -2,6 +2,7 @@
 
 import { cn } from '@/app/lib/utils';
 import { ChevronRight, FileX, Workflow, X } from 'lucide-react';
+import { formatSnapshotLink } from '@/app/graph/snapshot';
 import { getWorkspaceLabel } from '@/app/graph';
 import type { GraphWorkspace } from '@/app/graph';
 import { Button } from '@/app/components/ui/button';
@@ -51,9 +52,60 @@ export function WorkspaceSidebar() {
     <Sidebar>
       <WorkspaceSidebarHeader />
       <WorkspaceList />
+      <RemoteGraphs />
       <WorkspaceCredits />
     </Sidebar>
   );
+}
+
+function RemoteGraphs() {
+  const { send } = AppContext.useActorRef();
+  const account = AppContext.useSelector((state) => state.context.remoteAccount);
+  const current = AppContext.useSelector((state) => state.context.remote);
+  const original = current?.forkedFrom;
+  const originalUrl = original ? formatSnapshotLink(original) : null;
+  const visible = account || current;
+  if (!visible) return null;
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>GitHub snapshots</SidebarGroupLabel>
+      <SidebarMenu>
+        {current && (
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <a href={current.url}>Open saved snapshot</a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+        {originalUrl && (
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <a href={originalUrl}>Forked from original</a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+        {account && (
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => send({ type: 'remote.list' })}>
+              Find my GitHub snapshots
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+        <AccountSnapshotLinks />
+      </SidebarMenu>
+    </SidebarGroup>
+  );
+}
+
+function AccountSnapshotLinks() {
+  const snapshots = AppContext.useSelector((state) => state.context.accountSnapshots);
+  return snapshots.map((snapshot) => (
+    <SidebarMenuItem key={snapshot.url}>
+      <SidebarMenuButton asChild>
+        <a href={snapshot.url}>{snapshot.title}</a>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  ));
 }
 
 function WorkspaceList() {

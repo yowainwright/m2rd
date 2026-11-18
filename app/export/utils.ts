@@ -24,6 +24,8 @@ const exportOptions = {
   filter: shouldExportNode,
 };
 
+const svgDataUrlPrefix = 'data:image/svg+xml;charset=utf-8,';
+
 export const getSvgExportElement = () => {
   return document.querySelector<HTMLElement>(GRAPH_EXPORT_SELECTOR);
 };
@@ -54,6 +56,51 @@ export const exportSvg = async (input: SvgExportInput): Promise<GraphExportResul
   downloadDataUrl(dataUrl, fileName);
 
   return { fileName };
+};
+
+export const captureSvg = async (element: HTMLElement): Promise<string> => {
+  await element.ownerDocument.fonts?.ready;
+  element.getBoundingClientRect();
+  const animations = element.getAnimations?.({ subtree: true }) ?? [];
+  const running = animations.filter((animation) => animation.playState === 'running');
+  running.forEach((animation) => animation.pause());
+  try {
+    const dataUrl = await toSvgDataUrl(element);
+    return getStaticSvg(dataUrl, element);
+  } finally {
+    running.forEach((animation) => animation.play());
+  }
+};
+
+const getStaticSvg = (dataUrl: string, original: HTMLElement) => {
+  if (!dataUrl.startsWith(svgDataUrlPrefix)) throw new Error('Unable to capture graph SVG.');
+  const svg = decodeURIComponent(dataUrl.slice(svgDataUrlPrefix.length));
+  const document = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const clonedPaths = document.querySelectorAll('.react-flow__edge-path');
+  const originalPaths = original.querySelectorAll('.react-flow__edge-path');
+  clonedPaths.forEach((path, index) => copyEdgeFrame(path, originalPaths[index]));
+  document.querySelectorAll('[style]').forEach(disableAnimations);
+  return new XMLSerializer().serializeToString(document);
+};
+
+const copyEdgeFrame = (path: Element, original?: Element) => {
+  const canCopy = path instanceof SVGElement && original;
+  if (!canCopy) return;
+  const computed = getComputedStyle(original);
+  path.style.strokeDashoffset = computed.strokeDashoffset;
+  path.style.strokeDasharray = computed.strokeDasharray;
+  path.style.strokeOpacity = computed.strokeOpacity;
+  path.style.opacity = computed.opacity;
+};
+
+const disableAnimations = (element: Element) => {
+  const styled = element instanceof HTMLElement || element instanceof SVGElement;
+  if (!styled) return;
+  const { style } = element;
+  const animated = style.animationName && style.animationName !== 'none';
+  if (animated) style.animationName = 'none';
+  const transitioning = style.transitionProperty && style.transitionProperty !== 'none';
+  if (transitioning) style.transitionProperty = 'none';
 };
 
 function shouldExportNode(node: Node) {

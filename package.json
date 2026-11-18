@@ -24,6 +24,8 @@
     "cli:build": "rolldown --config scripts/cli/rolldown.config.ts",
     "cli:pack": "node scripts/cli/index.ts",
     "dev": "printf '\\n  App: http://localhost:%s/m2rd/\\n\\n' \"${M2RD_APP_PORT:-54783}\" && next dev --port ${M2RD_APP_PORT:-54783}",
+    "server:build": "pnpm --filter @m2rd/server run build",
+    "server:start": "pnpm --filter @m2rd/server run start",
     "build": "next build --webpack",
     "preview": "mkdir -p .next/cache/pages && ln -sfn ../../../out .next/cache/pages/m2rd && python3 -m http.server ${M2RD_PREVIEW_PORT:-54784} --bind 127.0.0.1 --directory .next/cache/pages",
     "release": "release-it patch",
@@ -38,10 +40,10 @@
     "lint:all": "pnpm run lint:fs && pnpm run lint:src && pnpm run lint:struct && pnpm run lint:oxlint && pnpm run lint:shell",
     "lint:ci": "pnpm run lint:fs && pnpm run lint:src && pnpm run lint:struct && pnpm run format:check && pnpm run lint:oxlint:strict && pnpm run lint:shell:ci",
     "lint:fs": "fs-lint check --root . --config scripts/.fs-lintrc --base \"${FS_LINT_BASE:-HEAD}\" && (git diff --no-renames --diff-filter=A --name-only -z HEAD && git ls-files --others --exclude-standard -z) | fs-lint check --root . --config scripts/.fs-lintrc --stdin0",
-    "lint:src": "git ls-files --cached --others --exclude-standard --deduplicate -z -- app tests scripts ':!:app/components/ui/**' | xargs -0 -n 1 sh -c 'test ! -f \"$1\" || src-lint check \"$1\"' sh",
-    "lint:struct": "struct-lint --profile ci app tests scripts",
-    "lint:oxlint": "oxlint -c scripts/oxlint.config.ts app tests scripts",
-    "lint:oxlint:strict": "oxlint -c scripts/oxlint.config.ts --deny-warnings app tests scripts",
+    "lint:src": "git ls-files --cached --others --exclude-standard --deduplicate -z -- app tests scripts packages/server ':!:app/components/ui/**' | xargs -0 -n 1 sh -c 'test ! -f \"$1\" || src-lint check \"$1\"' sh",
+    "lint:struct": "struct-lint --profile ci app tests scripts packages/server",
+    "lint:oxlint": "oxlint -c scripts/oxlint.config.ts app tests scripts packages/server",
+    "lint:oxlint:strict": "oxlint -c scripts/oxlint.config.ts --deny-warnings app tests scripts packages/server",
     "lint/run": "pnpm run lint:all",
     "lint/session": "pnpm run lint:fs && pnpm run lint:src && pnpm run lint:struct && pnpm run format:check && pnpm run lint:oxlint:strict && pnpm run lint:shell",
     "lint/session/all": "pnpm run lint/session",
@@ -50,7 +52,7 @@
     "lint:shell:ci": "shellcheck -x -S warning scripts/setup.sh",
     "mcp:generate": "node scripts/mcp/index.ts",
     "mcp:check": "node \"$HOME/.agents/lib/mcp/client.js\" --config .agents/mcp/shadcn.json shadcn get_item_examples_from_registries '{\"registries\":[\"@shadcn\"],\"query\":\"resizable-demo\"}'",
-    "typecheck": "pnpm run typecheck:mcp && tsc --noEmit",
+    "typecheck": "pnpm run typecheck:mcp && tsc --noEmit && pnpm --filter @m2rd/server run typecheck",
     "typecheck:mcp": "tsc --ignoreConfig --noEmit --module nodenext --target esnext --types node --allowImportingTsExtensions --skipLibCheck scripts/mcp/*.ts tests/unit/scripts/mcp/*.test.ts",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:e2e": "TMPDIR=.next/cache PLAYWRIGHT_LAST_RUN_OUTPUT_FILE=.next/cache/playwright/.last-run.json playwright test --config scripts/playwright.config.ts",
@@ -59,7 +61,7 @@
     "test:unit": "pnpm run test:mcp && TMPDIR=.next/cache vitest run --config scripts/vitest.config.mts tests/unit",
     "update": "pnpm run update:deps && pnpm install",
     "update:deps": "codependence --update",
-    "validate": "pnpm run lint/session && pnpm run typecheck && pnpm run cli:build && pnpm run test && pnpm run build",
+    "validate": "pnpm run lint/session && pnpm run typecheck && pnpm run cli:build && pnpm run server:build && pnpm run test && pnpm run build",
     "setup": "sh scripts/setup.sh",
     "prepare": "sh scripts/setup.sh prepare",
     "postinstall": "pastoralist"
@@ -85,6 +87,8 @@
     }
   },
   "dependencies": {
+    "@better-auth/oauth-provider": "1.7.25",
+    "better-auth": "1.7.25",
     "@codemirror/lint": "^6.9.8",
     "@codemirror/view": "^6.43.15",
     "@pinojs/redact": "^0.4.0",
@@ -130,6 +134,7 @@
     "xstate": "^5.33.4"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
     "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@testing-library/jest-dom": "^7.0.1",
@@ -184,7 +189,8 @@
     "appendix": {
       "lodash-es@4.18.1": {
         "dependents": {
-          "m2rd": "lodash-es (required by mermaid)"
+          "m2rd": "lodash-es (required by mermaid)",
+          "@m2rd/server": "lodash-es (required by mermaid)"
         },
         "ledger": {
           "addedDate": "2026-10-05T20:00:21.493Z",
@@ -194,7 +200,8 @@
       },
       "undici@7.29.0@7.30.2": {
         "dependents": {
-          "m2rd": "undici@7.29.0 (transitive dependency)"
+          "m2rd": "undici@7.29.0 (transitive dependency)",
+          "@m2rd/server": "undici@7.29.0 (transitive dependency)"
         },
         "ledger": {
           "addedDate": "2026-09-30T05:27:17.253Z",
@@ -253,7 +260,8 @@
       },
       "source-map-js@1.2.2": {
         "dependents": {
-          "m2rd": "source-map-js (required by @tailwindcss/postcss, @testing-library/jest-dom, autoprefixer)"
+          "m2rd": "source-map-js (required by @better-auth/oauth-provider, @tailwindcss/postcss, @testing-library/jest-dom)",
+          "@m2rd/server": "source-map-js (required by @better-auth/cimd, @better-auth/mcp, @better-auth/oauth-provider)"
         },
         "ledger": {
           "addedDate": "2026-10-06T01:02:24.934Z",
@@ -284,7 +292,8 @@
       },
       "katex@0.19.0": {
         "dependents": {
-          "m2rd": "katex (required by mermaid)"
+          "m2rd": "katex (required by mermaid)",
+          "@m2rd/server": "katex (required by mermaid)"
         },
         "ledger": {
           "addedDate": "2026-10-06T01:02:24.934Z",

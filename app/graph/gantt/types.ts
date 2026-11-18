@@ -1,5 +1,6 @@
+import { Schema } from 'effect';
+import { GraphStyleSchema } from '../types';
 import type { TranslationSettings } from '../types';
-import type { Schema } from 'effect';
 import type { CSSProperties } from 'react';
 import type { GanttTaskSchema } from './constants';
 
@@ -32,3 +33,22 @@ export interface GanttTaskOptions {
   ambiguousIdentity: boolean;
   settings: TranslationSettings;
 }
+
+export const GanttNodeDataSchema = Schema.Struct({
+  kind: Schema.Literals(['gantt-task', 'gantt-frame']),
+  label: Schema.String,
+  status: Schema.String,
+  start: Schema.optional(Schema.String),
+  end: Schema.optional(Schema.String),
+  section: Schema.optional(Schema.String),
+  ambiguousIdentity: Schema.optional(Schema.Boolean),
+  parts: Schema.Array(
+    Schema.Struct({
+      kind: Schema.Literals(['rect', 'text', 'line']),
+      text: Schema.optional(Schema.String),
+      style: GraphStyleSchema,
+    }),
+  ),
+  sourceStyle: GraphStyleSchema,
+  style: GraphStyleSchema,
+});

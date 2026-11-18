@@ -1094,15 +1094,10 @@ async function expectSidebarCredits(page: Page, header: Locator, sidebar: Locato
 }
 
 async function expectHeaderActions(page: Page, header: Locator) {
-  const names = await header
-    .getByRole('button')
-    .evaluateAll((buttons) =>
-      buttons.map((button) => button.getAttribute('aria-label') || button.textContent?.trim()),
-    );
-  expect(names).toEqual(['Toggle Sidebar', 'New', 'Rename graph', 'Save', 'Download', 'Delete']);
+  await expectHeaderActionNames(header);
   const actions = header.locator('button[aria-label]').filter({ has: page.locator('svg') });
-  await expect(actions).toHaveCount(3);
-  expect(await actions.allTextContents()).toEqual(['', '', '']);
+  await expect(actions).toHaveCount(4);
+  expect(await actions.allTextContents()).toEqual(['', '', '', '']);
   const classes = await actions.evaluateAll((buttons) => buttons.map((button) => button.className));
   expect(
     classes.every((value) => {
@@ -1132,6 +1127,23 @@ async function expectHeaderActions(page: Page, header: Locator) {
   await header.getByRole('button', { name: 'Download', exact: true }).click();
   await expect(page.getByRole('menuitem')).toHaveText(['SVG', 'PNG', 'GIF loop', 'GIF once']);
   await page.keyboard.press('Escape');
+}
+
+async function expectHeaderActionNames(header: Locator) {
+  const names = await header
+    .getByRole('button')
+    .evaluateAll((buttons) =>
+      buttons.map((button) => button.getAttribute('aria-label') || button.textContent?.trim()),
+    );
+  expect(names).toEqual([
+    'Toggle Sidebar',
+    'New',
+    'Rename graph',
+    'Save',
+    'Share',
+    'Download',
+    'Delete',
+  ]);
 }
 
 async function createNewGraph(page: Page) {

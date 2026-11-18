@@ -4,6 +4,9 @@ import { defineConfig } from 'vitest/config';
 const root = resolve(import.meta.dirname, '..');
 const nodeTests = [
   'tests/integration/cli/**/*.test.ts',
+  'tests/integration/auth/**/*.test.ts',
+  'tests/integration/mcp/**/*.test.ts',
+  'tests/integration/github/**/*.test.ts',
   'tests/integration/release/**/*.test.ts',
   'tests/unit/lib/cli/**/*.test.ts',
 ];

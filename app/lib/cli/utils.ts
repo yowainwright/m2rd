@@ -93,6 +93,51 @@ export const cleanText = (value: string) => {
     .trim();
 };
 
+export const renderSvgSource = async (source: string) => {
+  const sanitizingWindow = initializeMermaid(svgTheme);
+  try {
+    const rendered = await mermaid.render('m2rd-image', source);
+    return rendered.svg;
+  } finally {
+    sanitizingWindow.close();
+  }
+};
+
+export const initializeMermaid = (config: MermaidConfig = {}) => {
+  const sanitizingWindow = new JSDOM('').window;
+  Object.assign(createDOMPurify, createDOMPurify(sanitizingWindow));
+  const window = createHTMLWindow();
+  Object.assign(window, { Error, Math, Array, Function, Map, CSS: sanitizingWindow.CSS });
+  const pointFactory = window.document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  Object.assign(globalThis, {
+    window,
+    document: window.document,
+    CSSStyleSheet: sanitizingWindow.CSSStyleSheet,
+    DOMPoint: function SvgDomPoint(x = 0, y = 0) {
+      const point = pointFactory.createSVGPoint();
+      point.x = x;
+      point.y = y;
+      return point;
+    },
+    CSS: sanitizingWindow.CSS,
+    SVGElement: Reflect.get(window, 'SVGElement'),
+    SVGGraphicsElement: Reflect.get(window, 'SVGGraphicsElement'),
+    getComputedStyle: getSvgComputedStyle(sanitizingWindow),
+  });
+  enableParentElement();
+  enableRootSvgMatrix(window);
+  mermaid.initialize(
+    Object.assign({}, config, {
+      startOnLoad: false,
+      securityLevel: 'strict',
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
+      suppressErrorRendering: true,
+    }),
+  );
+  return sanitizingWindow;
+};
+
 const renderMermaidSource = async (source: string): Promise<RenderedMermaid> => {
   const sanitizingWindow = initializeMermaid();
   try {
@@ -158,17 +203,6 @@ const renderStateSource = async (source: string): Promise<RenderedMermaid> => {
   }
 };
 
-const renderSvgSource = async (source: string) => {
-  const sanitizingWindow = initializeMermaid(svgTheme);
-  try {
-    enableParentElement();
-    const rendered = await mermaid.render('m2rd-image', source);
-    return rendered.svg;
-  } finally {
-    sanitizingWindow.close();
-  }
-};
-
 const enableParentElement = () => {
   const NodeConstructor: typeof Node = Reflect.get(window, 'Node');
   const prototype = NodeConstructor.prototype;
@@ -183,26 +217,43 @@ const enableParentElement = () => {
   });
 };
 
-const initializeMermaid = (config: MermaidConfig = {}) => {
-  const sanitizingWindow = new JSDOM('').window;
-  Object.assign(createDOMPurify, createDOMPurify(sanitizingWindow));
-  const window = createHTMLWindow();
-  Object.assign(window, { Error, Math, Array, Function, Map, CSS: sanitizingWindow.CSS });
-  Object.assign(globalThis, {
-    window,
-    document: window.document,
-    CSSStyleSheet: sanitizingWindow.CSSStyleSheet,
+const enableRootSvgMatrix = (window: Window) => {
+  const constructor = Reflect.get(window, 'SVGSVGElement');
+  const prototype = constructor.prototype;
+  const getChildMatrix = Reflect.get(prototype, 'getCTM');
+  prototype.getCTM = function (this: SVGSVGElement) {
+    if (this.ownerSVGElement) return getChildMatrix.call(this);
+    return this.getScreenCTM();
+  };
+};
+
+const getSvgComputedStyle = (dom: JSDOM['window']) => {
+  const elements = new WeakMap<Element, Element>();
+  return (element: SVGGraphicsElement) => {
+    const original = element.ownerSVGElement ?? element;
+    if (!elements.has(original)) mirrorSvgStyles(original, dom.document, elements);
+    const mirror = elements.get(element) ?? dom.document.body;
+    return dom.getComputedStyle(mirror);
+  };
+};
+
+const mirrorSvgStyles = (svg: Element, document: Document, elements: WeakMap<Element, Element>) => {
+  const container = document.createElement('div');
+  container.innerHTML = svg.outerHTML;
+  const copy = container.firstElementChild;
+  if (!copy) return;
+  document.body.replaceChildren(container);
+  const sheet = document.createElement('style');
+  const rules = Array.from(copy.querySelectorAll('style'), (style) => style.textContent);
+  sheet.textContent = rules.join('\n');
+  document.head.replaceChildren(sheet);
+  const originals = svg.querySelectorAll('*');
+  const mirrors = copy.querySelectorAll('*');
+  elements.set(svg, copy);
+  Array.from(originals).forEach((element, index) => {
+    const mirror = mirrors[index];
+    if (mirror) elements.set(element, mirror);
   });
-  mermaid.initialize(
-    Object.assign({}, config, {
-      startOnLoad: false,
-      securityLevel: 'strict',
-      htmlLabels: false,
-      flowchart: { htmlLabels: false },
-      suppressErrorRendering: true,
-    }),
-  );
-  return sanitizingWindow;
 };
 
 const readStdin = async () => {
