@@ -1,3 +1,4 @@
+import { Schema } from 'effect';
 import type { CSSProperties } from 'react';
 import type { Edge, Node, Viewport } from 'reactflow';
 import type Dexie from 'dexie';
@@ -275,3 +276,162 @@ export type TranslationSettings = GraphTranslationSettings;
 export type EdgeAnimation = TranslationSettings['edgeAnimation'];
 export type EdgeMarkerValue = TranslationSettings['edgeMarker'];
 export type EdgeType = TranslationSettings['edgeType'];
+
+export const GraphPointSchema = Schema.Struct({ x: Schema.Finite, y: Schema.Finite });
+export const GraphIdSchema = Schema.String.check(Schema.isNonEmpty());
+export const GraphPositiveIntegerSchema = Schema.Int.check(
+  Schema.isBetween({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+);
+export const GraphEdgeTypeSchema = Schema.Literals(['default', 'smoothstep', 'step', 'straight']);
+
+const graphCssString = Schema.String.check(
+  Schema.isPattern(/^(?![^]*[\\;])(?![^]*(?:url\s*\(|image-set\s*\())[^]*$/i),
+);
+const graphCssValue = Schema.Union([graphCssString, Schema.Finite]);
+const graphStyleValue = Schema.optional(graphCssValue);
+const graphStyleString = Schema.optional(graphCssString);
+
+export const GraphStyleSchema = Schema.Struct({
+  '--m2rd-node-primary': graphStyleValue,
+  '--m2rd-node-surface': graphStyleValue,
+  '--m2rd-node-gradient-a': graphStyleValue,
+  '--m2rd-node-gradient-b': graphStyleValue,
+  '--m2rd-node-gradient-direction': graphStyleValue,
+  '--m2rd-node-gradient-split': graphStyleValue,
+  '--m2rd-node-shape': graphStyleValue,
+  alignItems: graphStyleString,
+  aspectRatio: graphStyleValue,
+  backgroundColor: graphStyleString,
+  backgroundImage: graphStyleString,
+  backgroundSize: graphStyleValue,
+  border: graphStyleValue,
+  borderColor: graphStyleString,
+  borderRadius: graphStyleValue,
+  borderStyle: graphStyleString,
+  borderWidth: graphStyleValue,
+  boxShadow: graphStyleString,
+  clipPath: graphStyleString,
+  color: graphStyleString,
+  display: Schema.optional(
+    Schema.Literals(['flex', 'block', 'inline', 'inline-block', 'none', 'grid']),
+  ),
+  fontFamily: graphStyleString,
+  fontSize: graphStyleValue,
+  fontStyle: graphStyleString,
+  fontWeight: graphStyleValue,
+  height: graphStyleValue,
+  justifyContent: graphStyleString,
+  left: graphStyleValue,
+  lineHeight: graphStyleValue,
+  minHeight: graphStyleValue,
+  minWidth: graphStyleValue,
+  opacity: graphStyleValue,
+  padding: graphStyleValue,
+  position: Schema.optional(Schema.Literals(['absolute', 'relative', 'static', 'fixed', 'sticky'])),
+  stroke: graphStyleString,
+  strokeWidth: graphStyleValue,
+  textAlign: Schema.optional(
+    Schema.Literals(['left', 'right', 'center', 'start', 'end', 'justify']),
+  ),
+  textDecoration: graphStyleString,
+  top: graphStyleValue,
+  transform: graphStyleString,
+  transformOrigin: graphStyleValue,
+  whiteSpace: graphStyleString,
+  width: graphStyleValue,
+});
+
+const GraphGradientSchema = Schema.Struct({
+  colorA: graphCssString,
+  colorB: graphCssString,
+  direction: Schema.Literals(['horizontal', 'radial', 'vertical']),
+  split: Schema.Finite,
+});
+
+export const GraphSettingsSchema = Schema.Struct({
+  edgeAnimation: Schema.Literals(['flow', 'none', 'pulse', 'surge']),
+  edgeColor: graphCssString,
+  edgeMarker: Schema.Literals(['arrow', 'arrowclosed', 'none']),
+  edgeType: GraphEdgeTypeSchema,
+  edgeWidth: Schema.Finite,
+  fontFamily: graphCssString,
+  inverseColor: graphCssString,
+  nodeGradient: GraphGradientSchema,
+  nodeBorder: Schema.Literals(['dashed', 'dotted', 'none', 'solid']),
+  nodeShape: Schema.Literals(['circle', 'cylinder', 'diamond', 'rectangle', 'square']),
+  nodeShadow: Schema.Literals(['none', 'soft', 'strong']),
+  nodeSurface: Schema.Literals([
+    'gradient',
+    'pattern-diagonal',
+    'pattern-dots',
+    'pattern-grid',
+    'pattern-polka-pin',
+    'solid',
+  ]),
+  primaryColor: graphCssString,
+});
+
+const GraphCanvasSchema = Schema.Struct({
+  background: Schema.Literals([
+    'aurora',
+    'dot-pattern',
+    'gradient',
+    'gradient-mesh',
+    'grid',
+    'none',
+    'pattern-checkerboard',
+    'pattern-diamond',
+    'pattern-diagonal',
+    'pattern-polka-pin',
+  ]),
+  gradient: GraphGradientSchema,
+  pattern: Schema.Struct({
+    backgroundColor: graphCssString,
+    color: graphCssString,
+    density: Schema.Finite,
+  }),
+  shader: Schema.Struct({
+    aurora: Schema.Struct({
+      colorA: graphCssString,
+      colorB: graphCssString,
+      colorC: graphCssString,
+    }),
+    gradientMesh: Schema.Struct({ colorA: graphCssString, colorB: graphCssString }),
+  }),
+  gridVisible: Schema.Boolean,
+  locked: Schema.Boolean,
+  snapToGrid: Schema.Boolean,
+});
+
+export const GraphViewSchema = Schema.Struct({
+  canvas: Schema.optional(GraphCanvasSchema),
+  selection: Schema.optional(
+    Schema.Struct({
+      edgeIds: Schema.mutable(Schema.Array(GraphIdSchema)),
+      nodeIds: Schema.mutable(Schema.Array(GraphIdSchema)),
+    }),
+  ),
+  viewport: Schema.optional(
+    Schema.Struct({
+      ...GraphPointSchema.fields,
+      zoom: Schema.Finite.check(Schema.isGreaterThan(0)),
+    }),
+  ),
+});
+
+export const GraphInputSchema = Schema.Struct({
+  format: Schema.Literal('mermaid'),
+  id: GraphIdSchema,
+  source: Schema.String,
+  updatedAt: Schema.String,
+  version: GraphPositiveIntegerSchema,
+  workspaceId: GraphIdSchema,
+});
+
+export const GraphWorkspaceSchema = Schema.Struct({
+  activeInputId: Schema.NullOr(GraphIdSchema),
+  activeTranslationId: Schema.NullOr(GraphIdSchema),
+  id: GraphIdSchema,
+  name: Schema.String,
+  updatedAt: Schema.String,
+});

@@ -1,9 +1,21 @@
+import { oauthProviderClient } from '@better-auth/oauth-provider/client';
+import { createAuthClient } from 'better-auth/client';
+import { captureSvg } from '@/app/export';
+import {
+  decodeSnapshot,
+  encodeSnapshot,
+  formatSnapshotLink,
+  parseSnapshotLink,
+} from '@/app/graph/snapshot';
+import {
+  completeRemoteDraft,
+  remoteDrafts,
+  readRemoteSnapshot,
+  rememberRemoteSnapshot,
+} from '@/app/graph/repository';
+import type { AccountSnapshot, RemoteDraft, SharedSnapshot } from '@/app/types';
+import { initializeBrowserRenderer, renderGraph } from '@/app/graph/render';
 import { Effect, Semaphore } from 'effect';
-import mermaid from 'mermaid';
-import { renderStateDiagram } from '@/app/graph/state';
-import { renderClassDiagram } from '@/app/graph/class';
-import { renderErDiagram } from '@/app/graph/er';
-import { renderGanttDiagram } from '@/app/graph/gantt';
 import { applyEdgeChanges, applyNodeChanges } from 'reactflow';
 import {
   applySavedAppearance,
@@ -13,7 +25,6 @@ import {
   getSelectedNodes,
   getTranslation,
   graphRepository,
-  parseMermaidSvg,
   updateSelectedEdges,
   updateSelectedNodes,
 } from '@/app/graph';
@@ -27,33 +38,25 @@ import type {
   GraphTranslationSettings,
   GraphWorkspace,
 } from '@/app/graph';
-import {
-  DEFAULT_CANVAS_SETTINGS,
-  DEFAULT_SETTINGS,
-  GRAPH_DIAGRAM_TYPES,
-} from '@/app/graph/constants';
+import { DEFAULT_CANVAS_SETTINGS, DEFAULT_SETTINGS } from '@/app/graph/constants';
 import { exportGif, exportPng, exportSvg, getSvgExportElement } from '@/app/export';
 import { createBrowserLogger } from '@/app/lib/observability';
 import { APP_INITIAL_CONTEXT, GRAPH_SAMPLES } from './constants';
 import type { AppContext, AppEvent, LoadedWorkspace, WorkspaceRequest } from './types';
 
-mermaid.initialize({
-  securityLevel: 'strict',
-  sequence: {
-    mirrorActors: true,
-    actorFontSize: 16,
-    messageFontSize: 16,
-    noteFontSize: 14,
-    messageMargin: 48,
-    boxTextMargin: 10,
-  },
-  startOnLoad: false,
-  themeVariables: { rectBkgColor: 'transparent' },
-});
+initializeBrowserRenderer();
 
 const browserLogger = createBrowserLogger();
 
 const renderSemaphore = Semaphore.makeUnsafe(1);
+
+const apiOrigin = process.env.NEXT_PUBLIC_M2RD_API_ORIGIN ?? 'https://m2rd-api.jeffry.in';
+
+export const authClient = createAuthClient({
+  baseURL: apiOrigin,
+  plugins: [oauthProviderClient()],
+  fetchOptions: { credentials: 'include' },
+});
 
 export const loadInitialWorkspace = () =>
   Effect.tryPromise({
@@ -61,10 +64,107 @@ export const loadInitialWorkspace = () =>
       const workspaces = await graphRepository.list();
       const [workspace] = workspaces;
       const records = workspace ? await graphRepository.read(workspace.id) : null;
-      return { records, workspaces };
+      return loadBrowserWorkspace(records, workspaces);
     },
     catch: storageError,
   });
+
+export const prepareRemoteDraft = (context: AppContext) =>
+  Effect.gen(function* () {
+    const element = getSvgExportElement();
+    if (!element) return yield* Effect.fail(new Error('There is no graph to save.'));
+    const svg = yield* Effect.tryPromise(() => captureSvg(element));
+    const records = yield* saveWorkspace(context);
+    const saveId = crypto.randomUUID();
+    const previous =
+      context.remote ?? (yield* Effect.tryPromise(() => readRemoteSnapshot(records.workspace.id)));
+    const target = previous ? { gistId: previous.gistId, revision: previous.revision } : undefined;
+    const snapshot = yield* encodeSnapshot({
+      records,
+      svg,
+      saveId,
+      ordinal: 1,
+      forkedFrom: previous?.forkedFrom,
+    });
+    const draft = { workspaceId: records.workspace.id, saveId, snapshot, target };
+    return { records, draft, captured: context };
+  });
+
+export const submitRemoteDraft = async (draft: RemoteDraft, signal: AbortSignal) => {
+  await remoteDrafts.put({ ...draft, reconcileOnly: true });
+  const payload = JSON.stringify({
+    snapshot: draft.snapshot,
+    target: draft.target,
+    forkId: draft.forkId,
+    reconcileOnly: draft.reconcileOnly,
+  });
+  const response = await fetch(`${apiOrigin}/api/snapshots`, {
+    method: 'POST',
+    credentials: 'include',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+  });
+  if (response.status === 401) {
+    await remoteDrafts.put(draft);
+    return null;
+  }
+  const data = await response.json();
+  if (response.ok) return acceptRemoteResult(data, draft);
+  const forkId = typeof data.forkId === 'string' ? data.forkId : draft.forkId;
+  const reconcileOnly = Boolean(draft.reconcileOnly || data.outcomeUnknown);
+  await remoteDrafts.put({ ...draft, forkId, reconcileOnly });
+  const message =
+    typeof data.error === 'string' ? data.error : 'The remote save could not be completed.';
+  throw new Error(message);
+};
+
+export const loadRemoteDraft = async (draft: RemoteDraft) =>
+  (await remoteDrafts.get(draft.saveId)) ?? draft;
+
+export const discardRemoteDraft = (draft: RemoteDraft | null) =>
+  Effect.tryPromise({
+    try: async () => {
+      if (!draft) throw new Error('There is no pending save to discard.');
+      await remoteDrafts.delete(draft.saveId);
+    },
+    catch: storageError,
+  });
+
+export const authorizeRemoteDraft = (context: AppContext) =>
+  Effect.gen(function* () {
+    const draft = context.remoteDraft;
+    if (!draft) return yield* Effect.fail(new Error('There is no remote save to continue.'));
+    let current = context;
+    if (context.needsRender) {
+      const rendered = yield* renderWorkspace(context);
+      current = Object.assign({}, context, acceptRenderedElements(context, rendered));
+    }
+    yield* saveWorkspace(current);
+    const returnTo = encodeURIComponent(`/m2rd/?save=${draft.saveId}`);
+    window.location.assign(`/m2rd/sign-in/?returnTo=${returnTo}`);
+  });
+
+export const copyRemoteLink = async (snapshot: SharedSnapshot) => {
+  const session = await authClient.getSession();
+  if (!session.data?.user) {
+    const returnTo = encodeURIComponent(window.location.pathname);
+    window.location.assign(`/m2rd/sign-in/?returnTo=${returnTo}`);
+    return;
+  }
+  await navigator.clipboard.writeText(snapshot.url);
+};
+
+export const readRemoteAccount = async () => {
+  const result = await authClient.getSession();
+  return result.data?.user.id ?? null;
+};
+
+export const listRemoteSnapshots = async (): Promise<AccountSnapshot[]> => {
+  const response = await fetch(`${apiOrigin}/api/snapshots`, { credentials: 'include' });
+  if (!response.ok) throw new Error('Saved graphs are unavailable.');
+  return response.json();
+};
 
 export const loadWorkspace = (request: WorkspaceRequest | null) =>
   Effect.tryPromise({
@@ -72,7 +172,7 @@ export const loadWorkspace = (request: WorkspaceRequest | null) =>
       if (!request) throw new Error('No graph was selected.');
       const records = await graphRepository.read(request.workspaceId, request.versionId);
       if (!records) throw new Error('This graph version is no longer available.');
-      return records;
+      return readStoredWorkspace(records);
     },
     catch: storageError,
   });
@@ -108,48 +208,12 @@ export const renameWorkspace = (context: AppContext) =>
 
 export const renderWorkspace = (context: AppContext) =>
   Effect.tryPromise({
-    try: async () => {
-      const id = `m2rd-${crypto.randomUUID()}`;
-      const parsed = await mermaid.parse(context.input.source);
-      const detectedType = getSupportedDiagramType(parsed.diagramType);
-      const nativeRenderer = {
-        stateDiagram: renderStateDiagram,
-        classDiagram: renderClassDiagram,
-        er: renderErDiagram,
-        gantt: renderGanttDiagram,
-      };
-      const isNative = detectedType !== 'flowchart' && detectedType !== 'sequence';
-      if (isNative) {
-        const elements = await nativeRenderer[detectedType](
-          id,
-          context.input.source,
-          context.translation.settings,
-        );
-        return { diagramType: detectedType, elements } satisfies GraphRenderResult;
-      }
-      const result = await mermaid.render(id, context.input.source);
-      const diagramType = getSupportedDiagramType(result.diagramType);
-      const elements = parseMermaidSvg(result.svg, context.translation.settings, diagramType);
-      return { diagramType, elements } satisfies GraphRenderResult;
-    },
+    try: () => renderGraph(context.input.source, context.translation.settings),
     catch: (cause) => {
       if (cause instanceof GraphRenderError) return cause;
       return new GraphRenderError('invalid', `Mermaid: ${toErrorMessage(cause)}`);
     },
   }).pipe(Effect.uninterruptible, renderSemaphore.withPermits(1));
-
-export const getSupportedDiagramType = (diagramType: string): GraphDiagramType => {
-  const normalizedType = diagramType === 'flowchart-v2' ? 'flowchart' : diagramType;
-  const isSupported = GRAPH_DIAGRAM_TYPES.includes(normalizedType as GraphDiagramType);
-  if (!isSupported) {
-    throw new GraphRenderError(
-      'unsupported',
-      `Mermaid diagram type "${diagramType}" is not supported in the React Flow view yet.`,
-      diagramType,
-    );
-  }
-  return normalizedType as GraphDiagramType;
-};
 
 export const exportWorkspace = (context: AppContext) =>
   Effect.tryPromise({
@@ -194,6 +258,9 @@ export const resetWorkspace = (context: AppContext, sample: GraphDiagramType = '
     operationError: null,
     exportError: null,
     loadRequest: null,
+    remote: null,
+    remoteDraft: null,
+    remoteError: null,
   };
 };
 
@@ -381,6 +448,81 @@ export const getSaveLabel = (snapshot: { hasTag: (tag: string) => boolean }) => 
   if (snapshot.hasTag('saving')) return 'Saving';
   if (snapshot.hasTag('saved')) return 'Saved';
   return 'Save';
+};
+
+const loadBrowserWorkspace = async (
+  records: GraphRecords | null,
+  workspaces: GraphWorkspace[],
+): Promise<LoadedWorkspace> => {
+  const params = new URLSearchParams(window.location.search);
+  const pendingId = params.get('save');
+  const pending = pendingId ? await remoteDrafts.get(pendingId) : undefined;
+  if (pending) {
+    const saved = await graphRepository.read(pending.workspaceId);
+    const resumePending = !params.has('cancel') && !params.has('error');
+    if (saved) {
+      const stored = await readStoredWorkspace(saved);
+      return { ...stored, workspaces, pending, resumePending };
+    }
+  }
+  const frozen = parseSnapshotLink(window.location.pathname);
+  if (frozen) {
+    try {
+      return await openSnapshot(frozen, workspaces);
+    } catch (cause) {
+      return { records, workspaces, sharedError: toErrorMessage(cause) };
+    }
+  }
+  if (!records) return { records, workspaces };
+  const stored = await readStoredWorkspace(records);
+  return { ...stored, workspaces };
+};
+
+const readStoredWorkspace = async (records: GraphRecords) => {
+  const { id } = records.workspace;
+  const shared = await readRemoteSnapshot(id);
+  const pending = await remoteDrafts.where('workspaceId').equals(id).first();
+  return { records, shared, pending };
+};
+
+const openSnapshot = async (
+  link: NonNullable<ReturnType<typeof parseSnapshotLink>>,
+  workspaces: GraphWorkspace[],
+) => {
+  const { gistId, revision } = link;
+  const response = await fetch(`${apiOrigin}/api/snapshots/${gistId}/${revision}`);
+  if (!response.ok) throw new Error('This saved graph is unavailable.');
+  const payload = await response.json();
+  const snapshot = await Effect.runPromise(decodeSnapshot(JSON.stringify(payload.snapshot)));
+  const { workspace, input, translation } = snapshot.records;
+  const records = await graphRepository.create({
+    workspace: { name: workspace.name },
+    input,
+    translation,
+  });
+  const url = formatSnapshotLink(link);
+  const shared = {
+    ...link,
+    fileName: payload.fileName,
+    url,
+    svg: snapshot.svg.text,
+    forkedFrom: snapshot.forkedFrom,
+  };
+  await rememberRemoteSnapshot(records.workspace.id, shared);
+  window.history.replaceState(null, '', '/m2rd/');
+  return { records, workspaces: rememberWorkspace(workspaces, records.workspace), shared };
+};
+
+const acceptRemoteResult = async (saved: SharedSnapshot, draft: RemoteDraft) => {
+  const snapshot = await Effect.runPromise(decodeSnapshot(draft.snapshot));
+  const shared = {
+    ...saved,
+    svg: snapshot.svg.text,
+    forkedFrom: saved.forkedFrom ?? snapshot.forkedFrom,
+  };
+  await completeRemoteDraft(draft, shared);
+  window.history.replaceState(null, '', window.location.pathname);
+  return shared;
 };
 
 const storageError = (cause: unknown) => {

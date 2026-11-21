@@ -1,7 +1,14 @@
+import { Schema } from 'effect';
+import { GraphStyleSchema } from '../types';
+import { StateHandleSchema } from '../state/types';
 import type { CSSProperties } from 'react';
-import type { Schema } from 'effect';
 import type { StateHandle, StatePoint } from '../state/types';
-import type { ClassEdgeSchema, ClassMetadataSchema, ClassNodeSchema } from './constants';
+import {
+  ClassEdgeSchema,
+  ClassPointsSchema,
+  type ClassMetadataSchema,
+  type ClassNodeSchema,
+} from './constants';
 
 export type ClassMetadata = Schema.Schema.Type<typeof ClassMetadataSchema>;
 export type ClassMetadataNode = Schema.Schema.Type<typeof ClassNodeSchema>;
@@ -33,3 +40,24 @@ export type ClassGeometry = {
   frame: ClassFrame;
   data: Omit<ClassNodeData, 'handles' | 'style'>;
 };
+
+export const ClassNodeDataSchema = Schema.Struct({
+  kind: Schema.Literal('class-node'),
+  shape: Schema.Literals(['classBox', 'namespace', 'note', 'interface']),
+  label: Schema.String,
+  rows: Schema.Array(Schema.Struct({ text: Schema.String, style: GraphStyleSchema })),
+  dividers: Schema.Array(Schema.Finite),
+  handles: Schema.Array(StateHandleSchema),
+  sourceStyle: GraphStyleSchema,
+  style: GraphStyleSchema,
+});
+
+export const ClassEdgeDataSchema = Schema.Struct({
+  kind: Schema.Literal('class-relation'),
+  points: ClassPointsSchema,
+  startMarker: ClassEdgeSchema.fields.arrowTypeStart,
+  endMarker: ClassEdgeSchema.fields.arrowTypeEnd,
+  startLabel: Schema.String,
+  endLabel: Schema.String,
+  pattern: ClassEdgeSchema.fields.pattern,
+});

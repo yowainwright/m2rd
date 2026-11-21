@@ -81,8 +81,10 @@ const createGanttTask = ({
   ambiguousIdentity,
   settings,
 }: GanttTaskOptions) => {
-  const shape = requireGanttGraphic(svg.getElementById(`${renderId}-${task.id}`));
-  const text = requireGanttGraphic(svg.getElementById(`${renderId}-${task.id}-text`));
+  const shape = requireGanttGraphic(svg.querySelector(`#${CSS.escape(`${renderId}-${task.id}`)}`));
+  const text = requireGanttGraphic(
+    svg.querySelector(`#${CSS.escape(`${renderId}-${task.id}-text`)}`),
+  );
   const incompatible = shape.tagName !== 'rect' || text.tagName !== 'text';
   if (incompatible) throw ganttCompatibilityError();
   const graphic = readGanttGraphic(shape);
@@ -127,7 +129,11 @@ const createGanttFrame = (svg: SVGSVGElement) => {
     sourceStyle: {},
     style: {},
   };
-  const { x, y, width, height } = svg.viewBox.baseVal;
+  const viewBox = svg.getAttribute('viewBox') ?? '';
+  const [x, y, width, height] = viewBox
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
   const frame = { x, y, width, height };
   const validFrame = Object.values(frame).every(Number.isFinite) && width > 0 && height > 0;
   if (!validFrame) throw ganttCompatibilityError();

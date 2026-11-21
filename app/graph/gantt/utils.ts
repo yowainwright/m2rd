@@ -117,7 +117,7 @@ const readGanttShapeStyle = (element: SVGGraphicsElement): CSSProperties => {
 };
 
 const readGanttOpacity = (element: Element): number => {
-  const opacity = Number(getComputedStyle(element).opacity);
+  const opacity = Number(getComputedStyle(element).opacity || '1');
   const parent = element.parentElement;
   if (!(parent instanceof SVGElement)) return opacity;
   return opacity * readGanttOpacity(parent);

@@ -100,6 +100,8 @@ jobs:
         run: npm version patch --no-git-tag-version --ignore-scripts
 
       - name: Check build
+        env:
+          NEXT_PUBLIC_M2RD_API_ORIGIN: http://127.0.0.1:54785
         run: pnpm run build
 
       - name: Check CLI build
@@ -110,6 +112,10 @@ jobs:
 
       - name: Test exported site
         run: pnpm run test:e2e
+
+      - name: Build Pages artifact with production API origin
+        if: inputs.pages-artifact
+        run: pnpm run build
 
       - name: Upload tested Pages artifact
         if: inputs.pages-artifact

@@ -1,7 +1,7 @@
 import type { StateNodeOptions } from './types';
 import { Array as EffectArray, Schema } from 'effect';
 import mermaid from 'mermaid';
-import mermaidMetadata from 'mermaid/package.json';
+import mermaidMetadata from 'mermaid/package.json' with { type: 'json' };
 import { MarkerType, Position, type Edge, type Node } from 'reactflow';
 import { GraphRenderError, type GraphElements, type TranslationSettings } from '../types';
 import { createEdgeStyle, createNodeStyle } from '../utils';

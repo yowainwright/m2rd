@@ -1,10 +1,11 @@
+import { Schema } from 'effect';
+import { GraphStyleSchema } from '../types';
 import type { TranslationSettings } from '../types';
 import type { CSSProperties } from 'react';
-import type { Schema } from 'effect';
 import type { Position } from 'reactflow';
-import type {
-  StateEdgeSchema,
-  StateLayoutSchema,
+import {
+  type StateEdgeSchema,
+  type StateLayoutSchema,
   StateNodeSchema,
   StatePointSchema,
 } from './constants';
@@ -39,3 +40,25 @@ export interface StateNodeOptions {
   handles: Map<string, StateHandle[]>;
   settings: TranslationSettings;
 }
+
+export const StateHandleSchema = Schema.Struct({
+  ...StatePointSchema.fields,
+  id: Schema.String,
+  type: Schema.Literals(['source', 'target']),
+  position: Schema.Literals(['top', 'right', 'bottom', 'left']),
+});
+
+export const StateNodeDataSchema = Schema.Struct({
+  kind: Schema.Literal('state-node'),
+  shape: StateNodeSchema.fields.shape,
+  label: Schema.String,
+  handles: Schema.Array(StateHandleSchema),
+  style: GraphStyleSchema,
+});
+
+export const StateEdgeDataSchema = Schema.Struct({
+  kind: Schema.Literal('state-transition'),
+  points: Schema.Array(StatePointSchema),
+  arrow: Schema.Boolean,
+  dashed: Schema.Boolean,
+});

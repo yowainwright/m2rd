@@ -134,7 +134,8 @@ const readNodeRecords = (svg: SVGSVGElement): FlowNodeRecord[] => {
   return Array.from(svg.querySelectorAll('.node')).map((node, index) => {
     const domId = node.getAttribute('id') || `node-${index}`;
     const id = getNodeId(domId);
-    const label = getText(node, '.nodeLabel') || id;
+    const renderedLabel = getText(node, '.nodeLabel') || getText(node, '.label text');
+    const label = renderedLabel || id;
 
     return { domId, id, label };
   });

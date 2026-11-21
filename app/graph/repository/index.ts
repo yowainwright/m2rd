@@ -1,3 +1,4 @@
+import type { RemoteDraft, SharedSnapshot } from '@/app/types';
 import Dexie from 'dexie';
 import {
   GRAPH_DATABASE_NAME,
@@ -37,6 +38,13 @@ database
     transaction.table(GRAPH_TABLES.inputs).toCollection().modify({ version: 1 }),
   );
 
+database.version(3).stores({ remoteDrafts: 'saveId, workspaceId', remoteSnapshots: 'workspaceId' });
+
+export const remoteDrafts = database.table<RemoteDraft, string>('remoteDrafts');
+const remoteSnapshots = database.table<{ workspaceId: string; snapshot: SharedSnapshot }, string>(
+  'remoteSnapshots',
+);
+
 export const graphRepository: GraphRepository = {
   create(input) {
     return database.transaction('rw', tables, () => putRecords(createRecords(input)));
@@ -71,6 +79,20 @@ export const graphRepository: GraphRepository = {
     return database.transaction('rw', tables, () => updateRecords(records));
   },
 };
+
+export const readRemoteSnapshot = async (workspaceId: string) => {
+  const record = await remoteSnapshots.get(workspaceId);
+  return record?.snapshot;
+};
+
+export const rememberRemoteSnapshot = (workspaceId: string, snapshot: SharedSnapshot) =>
+  remoteSnapshots.put({ workspaceId, snapshot });
+
+export const completeRemoteDraft = (draft: RemoteDraft, snapshot: SharedSnapshot) =>
+  database.transaction('rw', [remoteDrafts, remoteSnapshots], async () => {
+    await rememberRemoteSnapshot(draft.workspaceId, snapshot);
+    await remoteDrafts.delete(draft.saveId);
+  });
 
 export const getWorkspaceLabel = (workspace: GraphWorkspace, fallback = workspace.id) => {
   const name = workspace.name.trim();

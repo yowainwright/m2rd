@@ -151,6 +151,11 @@ export const APP_INITIAL_CONTEXT: AppContext = {
   exportError: null,
   loadRequest: null,
   exportRequest: { format: 'svg', repeat: 'forever' },
+  remote: null,
+  remoteDraft: null,
+  remoteAccount: null,
+  remoteError: null,
+  accountSnapshots: [],
   workspaces: [],
   versions: [],
   workspace: {
