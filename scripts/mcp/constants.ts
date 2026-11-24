@@ -1,5 +1,5 @@
 export const SHADCN_IMAGE =
-  'sha256:791589960981410b3c77a5006d83dd080375de1e6984c51200a9a2020474e890';
+  'sha256:a8680fb3c6968a2ffa1f2fe6cf4705cecf093001c3bf94bfb712d3d6b668fc6e';
 
 export const MCP_CONFIG_PATH = '.agents/mcp/shadcn.json';
 export const SKILL_PATH = '.agents/skills/shadcn-mcp/SKILL.md';
@@ -51,10 +51,12 @@ pnpm run mcp:check
 
 ## Find Components
 
-Use the existing shared MCP client with the generated config:
+Use the pinned official MCP Inspector CLI with the generated Docker config.
+The shared client at ~/.agents/lib/mcp/client.js does not support --config;
+it reads global server definitions and must not be used for this Docker config.
 
 \`\`\`sh
-node "$HOME/.agents/lib/mcp/client.js" --config .agents/mcp/shadcn.json shadcn get_item_examples_from_registries '{"registries":["@shadcn"],"query":"resizable-demo"}'
+pnpm exec mcp-inspector --cli --config .agents/mcp/shadcn.json --server shadcn --method tools/call --tool-name get_project_registries
 \`\`\`
 
 Read components.json, package.json, and the target files first.
@@ -96,9 +98,28 @@ tests, and verify visible changes in the browser before calling them working.
 ## Sandbox Limits
 
 The config starts the existing pinned image with docker run over stdio and
-removes the container when the call ends. Docker and the shared client must
-already be installed. If the image is missing, report that prerequisite; do not
-substitute an image or install packages automatically.
+removes the container when the call ends. Docker, Node >=26.12.1, and pnpm must
+already be installed. Install project devDependencies before running checks.
+Inspector 2.16.0 is pinned in package.json and the lockfile; the shadcn server
+still runs inside Docker. mcp:check regenerates the config for
+the current checkout before discovering tools. Tool discovery verifies the
+connection; also check registries and retrieve an example before declaring the
+setup operational.
+
+Build the image from tests/integration/mcp/Dockerfile before first use:
+
+\`\`\`sh
+pnpm run mcp:build
+docker image inspect m2rd-shadcn:4.21.2 --format '{{.Id}}'
+\`\`\`
+
+The recipe pins the Node base digest and shadcn version, disables install
+scripts, and runs shadcn mcp as the non-root node user in /workspace.
+Only this directory is the build context; project files are not copied.
+Compare the resulting ID with SHADCN_IMAGE in scripts/mcp/constants.ts. Image
+IDs can differ by architecture or resolved transitive dependencies. Review
+any changed ID before updating the pin, then run mcp:generate and mcp:check.
+Do not remove --pull never or replace the pin with a mutable tag.
 
 The container has one read-only host-file mount for components.json and
 receives no environment files or tokens. Its root filesystem is read-only, with
@@ -111,6 +132,7 @@ it does not establish that downloaded component code is safe. The approved
 local CLI addition writes to the app and is outside that container.
 
 References:
+- https://github.com/modelcontextprotocol/inspector/tree/2.16.0/cli
 - https://ui.shadcn.com/docs/mcp
 - https://ui.shadcn.com/docs/cli
 - https://ui.reactflow.dev/

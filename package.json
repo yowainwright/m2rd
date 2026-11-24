@@ -14,7 +14,7 @@
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": ">=26 <27",
+      "version": ">=26.12.1 <27",
       "onFail": "error"
     }
   },
@@ -47,8 +47,9 @@
     "lint/setup": "sh scripts/setup.sh --hooks-only",
     "lint:shell": "shfmt -d scripts/setup.sh && pnpm run lint:shell:ci && shellcheck-legibility check --config scripts/.shellcheck-legibility.toml scripts/setup.sh",
     "lint:shell:ci": "shellcheck -x -S warning scripts/setup.sh",
+    "mcp:build": "docker build --tag m2rd-shadcn:4.21.2 tests/integration/mcp",
     "mcp:generate": "node scripts/mcp/index.ts",
-    "mcp:check": "node \"$HOME/.agents/lib/mcp/client.js\" --config .agents/mcp/shadcn.json shadcn get_item_examples_from_registries '{\"registries\":[\"@shadcn\"],\"query\":\"resizable-demo\"}'",
+    "mcp:check": "node scripts/mcp/index.ts && mcp-inspector --cli --config .agents/mcp/shadcn.json --server shadcn --method tools/list",
     "typecheck": "pnpm run typecheck:mcp && tsc --noEmit",
     "typecheck:mcp": "tsc --ignoreConfig --noEmit --module nodenext --target esnext --types node --allowImportingTsExtensions --skipLibCheck scripts/mcp/*.ts tests/unit/scripts/mcp/*.test.ts",
     "test": "pnpm run test:unit && pnpm run test:integration",
@@ -124,6 +125,7 @@
     "xstate": "^5.33.2"
   },
   "devDependencies": {
+    "@modelcontextprotocol/inspector": "2.16.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
@@ -231,7 +233,7 @@
       },
       "proxy-addr@2.0.8": {
         "dependents": {
-          "m2rd": "proxy-addr (required by shadcn)"
+          "m2rd": "proxy-addr (required by @modelcontextprotocol/inspector, shadcn)"
         },
         "ledger": {
           "addedDate": "2026-10-06T01:02:24.934Z",
