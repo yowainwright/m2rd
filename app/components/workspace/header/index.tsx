@@ -2,16 +2,26 @@
 
 import { useCallback } from 'react';
 import Image from 'next/image';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Share2, Trash2 } from 'lucide-react';
 import { GRAPH_SAMPLES } from '@/app/constants';
 import type { GraphDiagramType } from '@/app/graph';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
 import { Button } from '@/app/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/app/components/ui/dialog';
 import { InputGroupAddon, InputGroupButton } from '@/app/components/ui/input-group';
 import { SidebarTrigger } from '@/app/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';
@@ -99,9 +109,119 @@ function HeaderActions() {
   };
   return (
     <div className="col-start-3 row-start-1 flex items-center gap-2 justify-self-end">
+      <RemoteControl />
+      <DiscardRemoteDialog />
       <ExportMenu canExport={canExport} onExport={handleExport} />
       <DeleteControl />
     </div>
+  );
+}
+
+function RemoteControl() {
+  const { send } = AppContext.useActorRef();
+  const account = AppContext.useSelector((state) => state.context.remoteAccount);
+  const saving = AppContext.useSelector((state) => state.hasTag('remoteSaving'));
+  const canSave = AppContext.useSelector((state) => state.can({ type: 'remote.save' }));
+  const canCopy = AppContext.useSelector((state) => state.can({ type: 'remote.copy' }));
+  const hasDraft = AppContext.useSelector((state) => Boolean(state.context.remoteDraft));
+  const accountText = account ? 'Signed in with GitHub' : 'GitHub sign-in required';
+  const saveText = hasDraft ? 'Retry GitHub save' : 'Save to GitHub';
+  const checkAccount = (open: boolean) => {
+    if (open) send({ type: 'remote.account' });
+  };
+  const label = saving ? 'Saving to GitHub' : 'Share';
+  return (
+    <DropdownMenu onOpenChange={checkAccount}>
+      <DropdownMenuTrigger asChild>
+        <Button aria-label={label} variant="ghost" size="icon" className="h-7 w-7" type="button">
+          <Share2 aria-hidden="true" className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-w-64">
+        <DropdownMenuLabel>{accountText}</DropdownMenuLabel>
+        <DropdownMenuLabel className="whitespace-normal font-normal">
+          Anyone with an unlisted Gist link can view it.
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={!canSave} onSelect={() => send({ type: 'remote.save' })}>
+          {saveText}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!canCopy} onSelect={() => send({ type: 'remote.copy' })}>
+          Copy saved link
+        </DropdownMenuItem>
+        <DiscardRemoteItem />
+        <AccountSignOut />
+        <RemoteFeedback />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function DiscardRemoteItem() {
+  const { send } = AppContext.useActorRef();
+  const hasDraft = AppContext.useSelector((state) => state.context.remoteDraft !== null);
+  const canDiscard = AppContext.useSelector((state) => state.can({ type: 'remote.discard' }));
+  if (!hasDraft) return null;
+  const discard = () => send({ type: 'remote.discard' });
+  return (
+    <DropdownMenuItem disabled={!canDiscard} onSelect={discard}>
+      Discard pending save…
+    </DropdownMenuItem>
+  );
+}
+
+function DiscardRemoteDialog() {
+  const { send } = AppContext.useActorRef();
+  const open = AppContext.useSelector((state) => state.matches({ remote: 'confirmingDiscard' }));
+  const cancel = () => send({ type: 'remote.discard.cancel' });
+  const confirm = () => send({ type: 'remote.discard.confirm' });
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) cancel();
+  };
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Discard pending GitHub save?</DialogTitle>
+          <DialogDescription>
+            GitHub may already have saved this graph. Saving again may create a duplicate. Your
+            edits stay in the editor, and existing GitHub saves will remain.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={cancel}>
+            Keep pending save
+          </Button>
+          <Button onClick={confirm}>Discard pending save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AccountSignOut() {
+  const { send } = AppContext.useActorRef();
+  const account = AppContext.useSelector((state) => state.context.remoteAccount);
+  if (!account) return null;
+  return (
+    <DropdownMenuItem onSelect={() => send({ type: 'remote.signOut' })}>Sign out</DropdownMenuItem>
+  );
+}
+
+function RemoteFeedback() {
+  const saving = AppContext.useSelector((state) => state.hasTag('remoteSaving'));
+  const copied = AppContext.useSelector((state) => state.hasTag('remoteCopied'));
+  const error = AppContext.useSelector((state) => state.context.remoteError);
+  return (
+    <>
+      {saving && <DropdownMenuLabel role="status">Saving to GitHub…</DropdownMenuLabel>}
+      {copied && <DropdownMenuLabel role="status">Saved link copied</DropdownMenuLabel>}
+      {error && (
+        <DropdownMenuLabel role="alert" className="whitespace-normal">
+          {error}
+        </DropdownMenuLabel>
+      )}
+    </>
   );
 }
 

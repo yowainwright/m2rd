@@ -3,33 +3,6 @@ import { useTheme } from '@/app/hooks/useTheme';
 import { useUnicode } from '@/app/hooks/useUnicode';
 import type { ScrollbarProps, ScrollViewProps } from './types';
 
-const Scrollbar = ({ length, contentLength, offset, vertical = false }: ScrollbarProps) => {
-  const theme = useTheme();
-  const unicode = useUnicode();
-  const total = Math.max(length, contentLength);
-  const size = Math.max(1, Math.round((length / total) * length));
-  const maximum = Math.max(0, total - length);
-  const start = maximum ? Math.round((offset / maximum) * (length - size)) : 0;
-  const track = vertical ? '│' : '─';
-  const trackChar = unicode ? track : '.';
-  const thumbChar = unicode ? '█' : '#';
-  const segments = Array.from({ length }, (_, index) => {
-    const isThumb = index >= start && index < start + size;
-    const color = isThumb ? theme.colors.primary : theme.colors.mutedForeground;
-    const glyph = isThumb ? thumbChar : trackChar;
-    const last = index === length - 1;
-    const lineBreak = vertical && !last;
-    const newline = lineBreak ? '\n' : '';
-    return (
-      <Text key={index} color={color}>
-        {glyph}
-        {newline}
-      </Text>
-    );
-  });
-  return <Text aria-hidden>{segments}</Text>;
-};
-
 export const ScrollView = ({
   width,
   height,
@@ -66,4 +39,31 @@ export const ScrollView = ({
       <Scrollbar length={width} contentLength={contentWidth} offset={left} />
     </Box>
   );
+};
+
+const Scrollbar = ({ length, contentLength, offset, vertical = false }: ScrollbarProps) => {
+  const theme = useTheme();
+  const unicode = useUnicode();
+  const total = Math.max(length, contentLength);
+  const size = Math.max(1, Math.round((length / total) * length));
+  const maximum = Math.max(0, total - length);
+  const start = maximum ? Math.round((offset / maximum) * (length - size)) : 0;
+  const track = vertical ? '│' : '─';
+  const trackChar = unicode ? track : '.';
+  const thumbChar = unicode ? '█' : '#';
+  const segments = Array.from({ length }, (_, index) => {
+    const isThumb = index >= start && index < start + size;
+    const color = isThumb ? theme.colors.primary : theme.colors.mutedForeground;
+    const glyph = isThumb ? thumbChar : trackChar;
+    const last = index === length - 1;
+    const lineBreak = vertical && !last;
+    const newline = lineBreak ? '\n' : '';
+    return (
+      <Text key={index} color={color}>
+        {glyph}
+        {newline}
+      </Text>
+    );
+  });
+  return <Text aria-hidden>{segments}</Text>;
 };

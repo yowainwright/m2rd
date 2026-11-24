@@ -15,6 +15,7 @@ const parent = {
   width: 400,
   height: 400,
 };
+
 const state = {
   id: 'Ready',
   domId: 'ready',
@@ -26,6 +27,7 @@ const state = {
   width: 100,
   height: 40,
 };
+
 const transition = {
   id: 'edge0',
   start: 'Ready',
@@ -39,9 +41,8 @@ const transition = {
     { x: 150, y: 106 },
   ],
 };
+
 const layout = { nodes: [state, parent], edges: [transition] };
-const create = (value: unknown = layout) =>
-  createStateElements(readStateLayout(value), DEFAULT_SETTINGS);
 
 const stateDiagramAdapterCases = {
   'uses IDs safe for React Flow attribute selectors': () => {
@@ -174,3 +175,7 @@ describe('state diagram adapter', () => {
   });
   Object.entries(stateDiagramAdapterCases).forEach(([name, run]) => test(name, run));
 });
+
+function create(value: unknown = layout) {
+  return createStateElements(readStateLayout(value), DEFAULT_SETTINGS);
+}

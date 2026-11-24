@@ -1,8 +1,8 @@
 import { createActor, fromPromise, waitFor } from 'xstate';
 import { expect, test, vi } from 'vitest';
 import type { Key } from 'ink';
-import { VIEWER_MACHINE } from '@/app/lib/cli/viewer/constants';
-import type { ViewerContext } from '@/app/lib/cli/viewer/types';
+import { VIEWER_MACHINE } from '@/packages/cli/src/viewer/constants';
+import type { ViewerContext } from '@/packages/cli/src/viewer/types';
 import {
   currentDiagram,
   keyboardEvent,
@@ -10,7 +10,7 @@ import {
   viewerInput,
   viewerStatusText,
   viewerTitle,
-} from '@/app/lib/cli/viewer/utils';
+} from '@/packages/cli/src/viewer/utils';
 
 const key: Key = {
   upArrow: false,

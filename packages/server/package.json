@@ -1,0 +1,48 @@
+{
+  "name": "@m2rd/server",
+  "version": "0.0.18",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rolldown --config rolldown.config.ts",
+    "start": "node dist/index.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@better-auth/cimd": "1.7.25",
+    "@better-auth/mcp": "1.7.25",
+    "@better-auth/oauth-provider": "1.7.25",
+    "@koa/cors": "5.0.0",
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "better-auth": "1.7.25",
+    "better-sqlite3": "13.2.0",
+    "dompurify": "3.4.17",
+    "effect": "^4.1.4",
+    "elkjs": "0.12.1",
+    "ink": "^8.0.0",
+    "ip-address": "10.7.6",
+    "jsdom": "30.1.2",
+    "koa": "3.3.0",
+    "marked": "18.2.0",
+    "mermaid": "^12.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "reactflow": "^11.11.4",
+    "string-width": "9.0.0",
+    "svgdom": "0.1.29",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jsdom": "30.0.0",
+    "@types/koa": "3.0.3",
+    "@types/koa__cors": "^5.0.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/svgdom": "0.1.2",
+    "auth": "1.7.25",
+    "rolldown": "^1.3.2",
+    "typescript": "^7.0.2"
+  }
+}

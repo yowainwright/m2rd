@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test';
+import packageMetadata from '../../package.json' with { type: 'json' };
 
 test('loads the exported app and its assets under /m2rd/', async ({ page }) => {
   const response = await page.goto('./');
   expect(response?.status()).toBe(200);
+  const appVersion = `v${packageMetadata.version}`;
+  await expect(page.locator('[data-sidebar="footer"]')).toContainText(appVersion);
   await expect(page.locator('.react-flow__node-sequenceParticipant')).toHaveCount(5);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',

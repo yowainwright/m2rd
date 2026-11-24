@@ -8,19 +8,6 @@ import { StateHandles, getStateEdgePath } from '@/app/components/diagrams/state'
 import { ER_MARKERS } from '@/app/graph/er/constants';
 import type { ErCardinality, ErEdgeData, ErNodeData } from '@/app/graph/er/types';
 
-const getErSurface = (data: ErNodeData) =>
-  Object.assign({}, data.sourceStyle, data.style, {
-    position: 'relative' as const,
-    width: '100%',
-    height: '100%',
-    padding: 0,
-    minWidth: 0,
-    minHeight: 0,
-    borderRadius: 0,
-    clipPath: undefined,
-    aspectRatio: undefined,
-  });
-
 export function ErDiagramNode({ id, data }: NodeProps<ErNodeData>) {
   const updateNodeInternals = useUpdateNodeInternals();
   useEffect(() => updateNodeInternals(id), [data.handles, id, updateNodeInternals]);
@@ -61,29 +48,6 @@ export function ErDiagramNode({ id, data }: NodeProps<ErNodeData>) {
   );
 }
 
-function RelationMarker({ id, kind, color }: { id: string; kind: ErCardinality; color: string }) {
-  const marker = ER_MARKERS[kind];
-  const middle = marker.height / 2;
-  const circle = marker.circle ? <circle cx="9" cy={middle} r="6" fill="white" /> : null;
-  return (
-    <marker
-      id={id}
-      data-er-marker={kind}
-      refX={marker.width}
-      refY={middle}
-      markerWidth={marker.width}
-      markerHeight={marker.height}
-      orient="auto-start-reverse"
-      markerUnits="userSpaceOnUse"
-      stroke={color}
-      fill="none"
-    >
-      {circle}
-      <path d={marker.path} />
-    </marker>
-  );
-}
-
 export function ErRelationEdge(props: EdgeProps<ErEdgeData>) {
   const markerId = useId();
   const route = getStateEdgePath(props);
@@ -114,5 +78,41 @@ export function ErRelationEdge(props: EdgeProps<ErEdgeData>) {
         labelShowBg
       />
     </>
+  );
+}
+
+const getErSurface = (data: ErNodeData) =>
+  Object.assign({}, data.sourceStyle, data.style, {
+    position: 'relative' as const,
+    width: '100%',
+    height: '100%',
+    padding: 0,
+    minWidth: 0,
+    minHeight: 0,
+    borderRadius: 0,
+    clipPath: undefined,
+    aspectRatio: undefined,
+  });
+
+function RelationMarker({ id, kind, color }: { id: string; kind: ErCardinality; color: string }) {
+  const marker = ER_MARKERS[kind];
+  const middle = marker.height / 2;
+  const circle = marker.circle ? <circle cx="9" cy={middle} r="6" fill="white" /> : null;
+  return (
+    <marker
+      id={id}
+      data-er-marker={kind}
+      refX={marker.width}
+      refY={middle}
+      markerWidth={marker.width}
+      markerHeight={marker.height}
+      orient="auto-start-reverse"
+      markerUnits="userSpaceOnUse"
+      stroke={color}
+      fill="none"
+    >
+      {circle}
+      <path d={marker.path} />
+    </marker>
   );
 }

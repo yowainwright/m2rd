@@ -11,63 +11,14 @@ import {
 } from '../utils';
 import { getText } from '../svg/utils';
 
-const getNodeId = (domId: string) => {
-  const [, nodeId] = domId.match(NODE_ID_PATTERN) || [];
-
-  return nodeId || domId;
-};
-
-const getClassValue = (element: Element, prefix: string) => {
-  const token = Array.from(element.classList).find((className) => className.startsWith(prefix));
-
-  return token?.slice(prefix.length);
-};
-
-const getEdgeIdEndpoints = (edge: Element) => {
-  const id = edge.getAttribute('id') || '';
-  const [, source, target] = id.match(EDGE_ID_PATTERN) || [];
-
-  return { source, target };
-};
-
-const readNodeRecords = (svg: SVGSVGElement): FlowNodeRecord[] => {
-  return Array.from(svg.querySelectorAll('.node')).map((node, index) => {
-    const domId = node.getAttribute('id') || `node-${index}`;
-    const id = getNodeId(domId);
-    const label = getText(node, '.nodeLabel') || id;
-
-    return { domId, id, label };
-  });
-};
-
-const createEndpointMap = (nodes: FlowNodeRecord[]) => {
-  const entries = nodes.flatMap<[string, string]>((node) => [
-    [node.id, node.id],
-    [node.domId, node.id],
-  ]);
-
-  return new Map(entries);
-};
-
-const getEndpoint = (
-  rawValue: string | undefined,
-  endpointMap: Map<string, string>,
-  fallback: string,
-) => {
-  if (!rawValue) {
-    return fallback;
-  }
-
-  const directEndpoint = endpointMap.get(rawValue);
-
-  if (directEndpoint) {
-    return directEndpoint;
-  }
-
-  const nodeId = getNodeId(rawValue);
-  const nodeEndpoint = endpointMap.get(nodeId);
-
-  return nodeEndpoint || fallback;
+export const parseFlowchartSvg = (
+  svg: SVGSVGElement,
+  settings: TranslationSettings,
+): GraphElements => {
+  const records = readNodeRecords(svg);
+  const nodes = records.map((node, index) => createFlowNode(node, index, settings));
+  const edges = createFlowEdges(svg, records, settings);
+  return { nodes, edges };
 };
 
 const createFlowNode = (
@@ -85,6 +36,17 @@ const createFlowNode = (
     position: { x, y },
     style: createNodeStyle(settings),
   };
+};
+
+const createFlowEdges = (
+  svg: SVGSVGElement,
+  nodes: FlowNodeRecord[],
+  settings: TranslationSettings,
+) => {
+  const endpointMap = createEndpointMap(nodes);
+  return Array.from(svg.querySelectorAll(EDGE_SELECTOR)).map((edge, index) =>
+    createFlowEdge({ edge, index, nodes, settings, endpointMap }),
+  );
 };
 
 const createFlowEdge = ({
@@ -125,23 +87,62 @@ const createFlowEdge = ({
   };
 };
 
-const createFlowEdges = (
-  svg: SVGSVGElement,
-  nodes: FlowNodeRecord[],
-  settings: TranslationSettings,
+const getEndpoint = (
+  rawValue: string | undefined,
+  endpointMap: Map<string, string>,
+  fallback: string,
 ) => {
-  const endpointMap = createEndpointMap(nodes);
-  return Array.from(svg.querySelectorAll(EDGE_SELECTOR)).map((edge, index) =>
-    createFlowEdge({ edge, index, nodes, settings, endpointMap }),
-  );
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const directEndpoint = endpointMap.get(rawValue);
+
+  if (directEndpoint) {
+    return directEndpoint;
+  }
+
+  const nodeId = getNodeId(rawValue);
+  const nodeEndpoint = endpointMap.get(nodeId);
+
+  return nodeEndpoint || fallback;
 };
 
-export const parseFlowchartSvg = (
-  svg: SVGSVGElement,
-  settings: TranslationSettings,
-): GraphElements => {
-  const records = readNodeRecords(svg);
-  const nodes = records.map((node, index) => createFlowNode(node, index, settings));
-  const edges = createFlowEdges(svg, records, settings);
-  return { nodes, edges };
+const getClassValue = (element: Element, prefix: string) => {
+  const token = Array.from(element.classList).find((className) => className.startsWith(prefix));
+
+  return token?.slice(prefix.length);
+};
+
+const getEdgeIdEndpoints = (edge: Element) => {
+  const id = edge.getAttribute('id') || '';
+  const [, source, target] = id.match(EDGE_ID_PATTERN) || [];
+
+  return { source, target };
+};
+
+const createEndpointMap = (nodes: FlowNodeRecord[]) => {
+  const entries = nodes.flatMap<[string, string]>((node) => [
+    [node.id, node.id],
+    [node.domId, node.id],
+  ]);
+
+  return new Map(entries);
+};
+
+const readNodeRecords = (svg: SVGSVGElement): FlowNodeRecord[] => {
+  return Array.from(svg.querySelectorAll('.node')).map((node, index) => {
+    const domId = node.getAttribute('id') || `node-${index}`;
+    const id = getNodeId(domId);
+    const renderedLabel = getText(node, '.nodeLabel') || getText(node, '.label text');
+    const label = renderedLabel || id;
+
+    return { domId, id, label };
+  });
+};
+
+const getNodeId = (domId: string) => {
+  const [, nodeId] = domId.match(NODE_ID_PATTERN) || [];
+
+  return nodeId || domId;
 };

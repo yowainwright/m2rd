@@ -17,25 +17,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/too
 import { getMermaidErrorLine } from '@/app/lib/mermaid';
 import type { ErrorDetailsProps, ErrorSourceLineProps, ErrorSourceProps } from './types';
 
-const PANEL_NAMES = {
-  mermaid: 'Mermaid input',
-  'react-flow': 'React Flow output',
-} as const;
-
 type PanelToggleProps = {
   isFocused: boolean;
   panel: 'mermaid' | 'react-flow';
   onToggle: () => void;
 };
 
-const getPanelToggleIcon = (panel: PanelToggleProps['panel'], isFocused: boolean) => {
-  const isFocusedMermaid = panel === 'mermaid' && isFocused;
-  const isFocusedReactFlow = panel === 'react-flow' && isFocused;
-  if (isFocusedMermaid) return ChevronLeft;
-  if (isFocusedReactFlow) return ChevronRight;
-  if (panel === 'mermaid') return ChevronRight;
-  return ChevronLeft;
-};
+const PANEL_NAMES = {
+  mermaid: 'Mermaid input',
+  'react-flow': 'React Flow output',
+} as const;
 
 export function WorkspacePanelToggle({ isFocused, panel, onToggle }: PanelToggleProps) {
   const label = isFocused ? 'Restore split view' : `Expand ${PANEL_NAMES[panel]} pane`;
@@ -114,6 +105,15 @@ export function WorkspaceErrors() {
     </Dialog>
   );
 }
+
+const getPanelToggleIcon = (panel: PanelToggleProps['panel'], isFocused: boolean) => {
+  const isFocusedMermaid = panel === 'mermaid' && isFocused;
+  const isFocusedReactFlow = panel === 'react-flow' && isFocused;
+  if (isFocusedMermaid) return ChevronLeft;
+  if (isFocusedReactFlow) return ChevronRight;
+  if (panel === 'mermaid') return ChevronRight;
+  return ChevronLeft;
+};
 
 function ErrorDetails({ error, source }: ErrorDetailsProps) {
   const line = source === null ? null : Effect.runSync(getMermaidErrorLine(source, error));

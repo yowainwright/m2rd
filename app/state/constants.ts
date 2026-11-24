@@ -101,6 +101,7 @@ const ACTIVE_DOCUMENT = appSetup.createStateConfig({
     },
     'workspace.delete': { guard: 'canDelete', target: '#workspace-deleting' },
     'workspace.save': { guard: 'canSave', target: '.saving' },
+    'remote.authorize': { target: '#workspace-signing-in' },
   },
   states: {
     ready: {},
@@ -174,12 +175,18 @@ const DOCUMENT = appSetup.createStateConfig({
           {
             guard: { type: 'initialWorkspaceNeedsRender', params: getActorOutput },
             target: 'active.rendering',
-            actions: { type: 'restoreInitialWorkspace', params: getActorOutput },
+            actions: [
+              { type: 'restoreInitialWorkspace', params: getActorOutput },
+              { type: 'resumeRemoteDraft', params: getActorOutput },
+            ],
           },
           {
             guard: { type: 'hasInitialWorkspace', params: getActorOutput },
             target: 'active.ready',
-            actions: { type: 'restoreInitialWorkspace', params: getActorOutput },
+            actions: [
+              { type: 'restoreInitialWorkspace', params: getActorOutput },
+              { type: 'resumeRemoteDraft', params: getActorOutput },
+            ],
           },
           {
             target: 'active.rendering',
@@ -193,6 +200,18 @@ const DOCUMENT = appSetup.createStateConfig({
       },
     },
     active: ACTIVE_DOCUMENT,
+    signingIn: {
+      id: 'workspace-signing-in',
+      tags: ['storageBusy'],
+      invoke: {
+        src: 'authorizeRemote',
+        input: getActorInput,
+        onError: {
+          target: 'active.recover',
+          actions: { type: 'reportOperationError', params: getActorError },
+        },
+      },
+    },
     loading: {
       id: 'workspace-loading',
       tags: ['reading', 'storageBusy'],
@@ -234,6 +253,114 @@ const DOCUMENT = appSetup.createStateConfig({
   },
 });
 
+const REMOTE = appSetup.createStateConfig({
+  initial: 'idle',
+  states: {
+    checking: {
+      invoke: {
+        src: 'account',
+        onDone: {
+          target: 'idle',
+          actions: { type: 'acceptRemoteAccount', params: getActorOutput },
+        },
+        onError: 'idle',
+      },
+      on: { 'remote.resume': { guard: 'canRetryRemoteSave', target: 'saving' } },
+    },
+    idle: {
+      on: {
+        'remote.account': 'checking',
+        'remote.save': [
+          { guard: 'canRetryRemoteSave', target: 'saving' },
+          { guard: 'canRemoteSave', target: 'capturing' },
+        ],
+        'remote.resume': { guard: 'canRetryRemoteSave', target: 'saving' },
+        'remote.discard': { guard: 'canRetryRemoteSave', target: 'confirmingDiscard' },
+        'remote.copy': { guard: 'hasRemoteLink', target: 'copying' },
+        'remote.signOut': 'signingOut',
+        'remote.list': 'listing',
+      },
+    },
+    capturing: {
+      tags: ['remoteSaving'],
+      invoke: {
+        src: 'captureRemote',
+        input: getActorInput,
+        onDone: [
+          {
+            guard: { type: 'capturedCurrentDraft', params: getActorOutput },
+            target: 'saving',
+            actions: { type: 'acceptRemoteDraft', params: getActorOutput },
+          },
+          { target: 'idle', actions: 'reportCaptureChanged' },
+        ],
+        onError: { target: 'idle', actions: { type: 'reportRemoteError', params: getActorError } },
+      },
+    },
+    confirmingDiscard: {
+      on: {
+        'remote.discard.cancel': 'idle',
+        'remote.discard.confirm': 'discarding',
+      },
+    },
+    discarding: {
+      tags: ['remoteSaving'],
+      invoke: {
+        src: 'discardRemote',
+        input: getActorInput,
+        onDone: { target: 'idle', actions: 'clearRemoteDraft' },
+        onError: { target: 'idle', actions: { type: 'reportRemoteError', params: getActorError } },
+      },
+    },
+    saving: {
+      tags: ['remoteSaving'],
+      entry: 'clearRemoteError',
+      invoke: {
+        src: 'saveRemote',
+        input: getActorInput,
+        onDone: [
+          {
+            guard: { type: 'remoteSaveNeedsSignIn', params: getActorOutput },
+            target: 'idle',
+            actions: 'requestRemoteSignIn',
+          },
+          {
+            target: 'checking',
+            actions: { type: 'acceptRemoteSave', params: getActorOutput },
+          },
+        ],
+        onError: { target: 'idle', actions: { type: 'reportRemoteError', params: getActorError } },
+      },
+    },
+    copying: {
+      invoke: {
+        src: 'copyRemote',
+        input: getActorInput,
+        onDone: 'copied',
+        onError: { target: 'idle', actions: { type: 'reportRemoteError', params: getActorError } },
+      },
+    },
+    copied: { tags: ['remoteCopied'], after: { savedFeedback: 'idle' } },
+    signingOut: {
+      invoke: {
+        src: 'signOut',
+        onDone: { target: 'idle', actions: 'clearRemoteAccount' },
+        onError: { target: 'idle', actions: { type: 'reportRemoteError', params: getActorError } },
+      },
+    },
+    listing: {
+      invoke: {
+        src: 'listRemote',
+        onDone: {
+          target: 'idle',
+          actions: { type: 'acceptAccountSnapshots', params: getActorOutput },
+        },
+        onError: { target: 'idle', actions: { type: 'reportRemoteError', params: getActorError } },
+      },
+    },
+  },
+});
+
 export const APP_MACHINE_CONFIG = {
   id: 'm2rd',
   type: 'parallel',
@@ -247,5 +374,5 @@ export const APP_MACHINE_CONFIG = {
     'error.dismiss': { actions: 'clearErrors' },
     'error.view': { actions: 'showError' },
   },
-  states: { document: DOCUMENT, title: TITLE, exporting: EXPORTING },
+  states: { document: DOCUMENT, title: TITLE, exporting: EXPORTING, remote: REMOTE },
 } satisfies Parameters<typeof appSetup.createMachine>[0];

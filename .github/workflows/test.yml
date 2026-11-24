@@ -7,17 +7,28 @@ on:
         description: Exact revision to validate for release
         type: string
         required: false
-  push:
-    branches: [main]
+      pages-artifact:
+        description: Upload the tested static site for deployment
+        type: boolean
+        default: false
+      patch-version:
+        description: Build the site with the upcoming patch release version
+        type: boolean
+        default: false
   pull_request:
     branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   dependency-security:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -44,6 +55,7 @@ jobs:
 
   lint-and-typecheck:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       FS_LINT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
     steps:
@@ -74,7 +86,7 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
         run: |
-          /home/linuxbrew/.linuxbrew/bin/brew install yowainwright/tap/fs-lint yowainwright/tap/src-lint
+          /home/linuxbrew/.linuxbrew/bin/brew install yowainwright/tap/fs-lint yowainwright/tap/src-lint yowainwright/tap/struct-lint
           echo /home/linuxbrew/.linuxbrew/bin >> "$GITHUB_PATH"
 
       - name: Type check
@@ -83,20 +95,38 @@ jobs:
       - name: Lint
         run: pnpm run lint:ci
 
+      - name: Prepare site release version
+        if: inputs.patch-version
+        run: npm version patch --no-git-tag-version --ignore-scripts
+
       - name: Check build
+        env:
+          NEXT_PUBLIC_M2RD_API_ORIGIN: http://127.0.0.1:54785
         run: pnpm run build
 
       - name: Check CLI build
         run: pnpm run cli:build
 
       - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps --only-shell chromium
 
       - name: Test exported site
         run: pnpm run test:e2e
 
+      - name: Build Pages artifact with production API origin
+        if: inputs.pages-artifact
+        run: pnpm run build
+
+      - name: Upload tested Pages artifact
+        if: inputs.pages-artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
+        with:
+          path: out
+          retention-days: 1
+
   unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0

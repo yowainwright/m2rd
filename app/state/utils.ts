@@ -2,11 +2,26 @@ import { and, assign, assertEvent, enqueueActions, fromPromise, not, setup, stat
 import type { Viewport } from 'reactflow';
 import { APP_INITIAL_CONTEXT, SAVE_FEEDBACK_MS } from '@/app/constants';
 import { EMPTY_GRAPH_NAME_ERROR, LEGACY_UNTITLED_GRAPH_NAME } from '@/app/graph/constants';
-import type { AppContext as AppMachineContext, AppEvent, LoadedWorkspace } from '@/app/types';
+import type {
+  AccountSnapshot,
+  AppContext as AppMachineContext,
+  AppEvent,
+  LoadedWorkspace,
+  SharedSnapshot,
+} from '@/app/types';
 import type { GraphRecords, GraphRenderResult, GraphWorkspace } from '@/app/graph';
 import type { SavedWorkspace } from './types';
 import { runOperation } from '@/app/lib/effect';
 import {
+  authClient,
+  authorizeRemoteDraft,
+  discardRemoteDraft,
+  copyRemoteLink,
+  listRemoteSnapshots,
+  loadRemoteDraft,
+  prepareRemoteDraft,
+  readRemoteAccount,
+  submitRemoteDraft,
   acceptRenderedElements,
   acceptSavedWorkspace,
   deleteWorkspace,
@@ -29,23 +44,46 @@ import {
   updateTranslation,
 } from '@/app/utils';
 
-export const getActorInput = ({ context }: { context: AppMachineContext }) => context;
-export const getActorOutput = <Value>({ event }: { event: { output: Value } }) => event.output;
-export const getActorError = ({ event }: { event: { error: unknown } }) => event.error;
+type CaptureOutput = {
+  records: GraphRecords;
+  draft: NonNullable<AppMachineContext['remoteDraft']>;
+  captured: AppMachineContext;
+};
 
 const MAX_VIEWPORT_HISTORY = 5;
-const isSameViewport = (current: Viewport | undefined, next: Viewport) => {
-  if (!current) return false;
-  const sameX = current.x === next.x;
-  const sameY = current.y === next.y;
-  const sameZoom = current.zoom === next.zoom;
-  const samePosition = sameX && sameY;
-  return samePosition && sameZoom;
-};
 
 const actorSetup = setup({
   types: {} as { context: AppMachineContext; events: AppEvent },
   actors: {
+    captureRemote: fromPromise(
+      ({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+        runOperation(prepareRemoteDraft(input), signal),
+    ),
+    saveRemote: fromPromise(
+      async ({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) => {
+        if (!input.remoteDraft) throw new Error('There is no remote save to continue.');
+        const draft = await loadRemoteDraft(input.remoteDraft);
+        return submitRemoteDraft(draft, signal);
+      },
+    ),
+    authorizeRemote: fromPromise(
+      ({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+        runOperation(authorizeRemoteDraft(input), signal),
+    ),
+    discardRemote: fromPromise(
+      ({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+        runOperation(discardRemoteDraft(input.remoteDraft), signal),
+    ),
+    account: fromPromise(readRemoteAccount),
+    signOut: fromPromise(async () => {
+      const result = await authClient.signOut();
+      if (result.error) throw new Error('Sign-out could not be completed.');
+    }),
+    copyRemote: fromPromise(({ input }: { input: AppMachineContext }) => {
+      if (!input.remote) return Promise.resolve();
+      return copyRemoteLink(input.remote);
+    }),
+    listRemote: fromPromise(listRemoteSnapshots),
     initialize: fromPromise<LoadedWorkspace>(({ signal }) =>
       runOperation(loadInitialWorkspace(), signal),
     ),
@@ -115,29 +153,91 @@ const layoutSetup = actorSetup.extend({
 const documentSetup = layoutSetup.extend({
   delays: { savedFeedback: SAVE_FEEDBACK_MS },
   guards: {
+    hasRemoteDraft: ({ context }) => context.remoteDraft !== null,
+    canRetryRemoteSave: and(['hasRemoteDraft', stateIn({ document: 'active' })]),
+    hasRemoteLink: ({ context }) => context.remote !== null,
+    canRemoteSave: and([
+      stateIn({ document: 'active' }),
+      'hasValidGraph',
+      'isNotRenaming',
+      'isNotExporting',
+      not(stateIn({ document: { active: 'rendering' } })),
+      not(stateIn({ document: { active: 'saving' } })),
+    ]),
+    capturedCurrentDraft: ({ context }, output: CaptureOutput) =>
+      isCurrentDraft(context, output.captured),
+    remoteSaveNeedsSignIn: (_, output: SharedSnapshot | null) => output === null,
     initialWorkspaceNeedsRender: (_, output: LoadedWorkspace) =>
       output.records !== null && shouldRerenderWorkspace(output.records),
     hasInitialWorkspace: (_, output: LoadedWorkspace) => output.records !== null,
-    loadedWorkspaceNeedsRender: (_, records: GraphRecords) => shouldRerenderWorkspace(records),
+    loadedWorkspaceNeedsRender: (_, { records }: { records: GraphRecords }) =>
+      shouldRerenderWorkspace(records),
     savedCurrentDraft: ({ context }, output: SavedWorkspace) =>
       isCurrentDraft(context, output.draft),
-    canNavigate: and(['isNotExporting', 'isNotRenaming']),
-    canDelete: and(['isSavedWorkspace', 'isNotExporting', 'isNotRenaming']),
-    canSave: and(['hasValidGraph', 'isNotRenaming']),
+    isNotRemoteBusy: and([
+      not(stateIn({ remote: 'capturing' })),
+      not(stateIn({ remote: 'saving' })),
+      not(stateIn({ remote: 'confirmingDiscard' })),
+      not(stateIn({ remote: 'discarding' })),
+    ]),
+    canNavigate: and(['isNotExporting', 'isNotRenaming', 'isNotRemoteBusy']),
+    canDelete: and(['isSavedWorkspace', 'isNotExporting', 'isNotRenaming', 'isNotRemoteBusy']),
+    canSave: and(['hasValidGraph', 'isNotRenaming', 'isNotRemoteBusy']),
     canGoBackViewport: ({ context }) => context.viewportHistory.length > 0,
     canGoForwardViewport: ({ context }) => context.viewportForwardHistory.length > 0,
   },
   actions: {
-    restoreInitialWorkspace: assign(({ context }, { records, workspaces }: LoadedWorkspace) => {
-      if (!records) return { workspaces, viewportHistory: [], viewportForwardHistory: [] };
-      return Object.assign({}, restoreWorkspace(context, records), {
-        workspaces,
-        viewportHistory: [],
-        viewportForwardHistory: [],
-      });
+    resumeRemoteDraft: enqueueActions(({ enqueue }, output: LoadedWorkspace) => {
+      if (output.resumePending) enqueue.raise({ type: 'remote.resume' });
     }),
+    requestRemoteSignIn: enqueueActions(({ enqueue }) => {
+      enqueue.raise({ type: 'remote.authorize' });
+    }),
+    acceptRemoteDraft: assign(({ context }, output: CaptureOutput) => ({
+      ...acceptSavedWorkspace(context, output.records),
+      remoteDraft: output.draft,
+      remoteError: null,
+    })),
+    acceptRemoteSave: assign(({ context }, output: SharedSnapshot | null) => {
+      if (!output) return {};
+      return {
+        remote: output,
+        remoteDraft: null,
+        remoteError: null,
+        remoteAccount: context.remoteAccount,
+      };
+    }),
+    reportRemoteError: assign((_, error: unknown) => ({ remoteError: toErrorMessage(error) })),
+    reportCaptureChanged: assign({
+      remoteError: 'The graph changed during capture. Save the edited graph again.',
+    }),
+    clearRemoteError: assign({ remoteError: null }),
+    clearRemoteDraft: assign({ remoteDraft: null, remoteError: null }),
+    acceptRemoteAccount: assign((_, id: string | null) => ({ remoteAccount: id })),
+    clearRemoteAccount: assign({ remoteAccount: null, accountSnapshots: [] }),
+    acceptAccountSnapshots: assign((_, accountSnapshots: AccountSnapshot[]) => ({
+      accountSnapshots,
+    })),
+    restoreInitialWorkspace: assign(
+      ({ context }, { records, workspaces, shared, pending, sharedError }: LoadedWorkspace) => {
+        if (!records) return { workspaces, viewportHistory: [], viewportForwardHistory: [] };
+        return Object.assign({}, restoreWorkspace(context, records), {
+          remote: shared ?? null,
+          remoteDraft: pending ?? null,
+          remoteError: sharedError ?? null,
+          operationError: sharedError ?? null,
+          errorDialogDismissed: !sharedError,
+          workspaces,
+          viewportHistory: [],
+          viewportForwardHistory: [],
+        });
+      },
+    ),
     acceptInitialWorkspaces: assign((_, output: LoadedWorkspace) => ({
       workspaces: output.workspaces,
+      remoteError: output.sharedError ?? null,
+      operationError: output.sharedError ?? null,
+      errorDialogDismissed: !output.sharedError,
       viewportHistory: [],
       viewportForwardHistory: [],
     })),
@@ -147,11 +247,20 @@ const documentSetup = layoutSetup.extend({
     acceptSavedWorkspace: assign(({ context }, output: SavedWorkspace) =>
       acceptSavedWorkspace(context, output.records),
     ),
-    restoreWorkspace: assign(({ context }, records: GraphRecords) =>
-      Object.assign({}, restoreWorkspace(context, records), {
-        viewportHistory: [],
-        viewportForwardHistory: [],
-      }),
+    restoreWorkspace: assign(
+      (
+        { context },
+        { records, shared, pending }: Pick<LoadedWorkspace, 'records' | 'shared' | 'pending'>,
+      ) => {
+        if (!records) return {};
+        return Object.assign({}, restoreWorkspace(context, records), {
+          remote: shared ?? null,
+          remoteDraft: pending ?? null,
+          remoteError: null,
+          viewportHistory: [],
+          viewportForwardHistory: [],
+        });
+      },
     ),
     acceptDeletedWorkspace: assign(({ context }) => {
       const workspaces = context.workspaces.filter((item) => item.id !== context.workspace.id);
@@ -345,3 +454,96 @@ export const appSetup = titleSetup.extend({
     }),
   },
 });
+
+const authFormSetup = setup({
+  types: {} as {
+    context: { action: 'sign-in' | 'allow' | 'deny'; error: string | null };
+    events: { type: 'submit'; action: 'sign-in' | 'allow' | 'deny' };
+  },
+  actors: {
+    authorize: fromPromise(async ({ input }: { input: 'sign-in' | 'allow' | 'deny' }) => {
+      if (input === 'sign-in') {
+        await startGitHubSignIn();
+        return;
+      }
+      const result = await authClient.oauth2.consent({ accept: input === 'allow' });
+      if (result.error) throw new Error('The authorization request expired or was rejected.');
+      if (result.data?.url) window.location.assign(result.data.url);
+    }),
+  },
+});
+
+export const AUTH_FORM = authFormSetup.createMachine({
+  context: { action: 'sign-in', error: null },
+  initial: 'ready',
+  states: {
+    ready: {
+      on: {
+        submit: {
+          target: 'submitting',
+          actions: assign(({ event }) => ({ action: event.action, error: null })),
+        },
+      },
+    },
+    submitting: {
+      invoke: {
+        src: 'authorize',
+        input: ({ context }) => context.action,
+        onDone: 'ready',
+        onError: {
+          target: 'ready',
+          actions: assign(({ event }) => ({ error: toErrorMessage(event.error) })),
+        },
+      },
+    },
+  },
+});
+
+export const getActorInput = ({ context }: { context: AppMachineContext }) => context;
+
+export const getActorOutput = <Value>({ event }: { event: { output: Value } }) => event.output;
+
+export const getActorError = ({ event }: { event: { error: unknown } }) => event.error;
+
+export const getSignInCancelPath = () => {
+  if (typeof window === 'undefined') return '/m2rd/';
+  const params = new URLSearchParams(window.location.search);
+  return signInCancelPath(getSafeSignInReturn(params.get('returnTo') ?? '/m2rd/'));
+};
+
+function isSameViewport(current: Viewport | undefined, next: Viewport) {
+  if (!current) return false;
+  const sameX = current.x === next.x;
+  const sameY = current.y === next.y;
+  const sameZoom = current.zoom === next.zoom;
+  const samePosition = sameX && sameY;
+  return samePosition && sameZoom;
+}
+
+const startGitHubSignIn = async () => {
+  const params = new URLSearchParams(window.location.search);
+  const requested = params.get('returnTo') ?? '/m2rd/';
+  const path = getSafeSignInReturn(requested);
+  const callbackURL = window.location.origin + path;
+  const errorCallbackURL = window.location.origin + signInCancelPath(path);
+  const result = await authClient.signIn.social({
+    provider: 'github',
+    callbackURL,
+    errorCallbackURL,
+    disableRedirect: true,
+  });
+  if (result.error) throw new Error('GitHub sign-in could not be started.');
+  if (result.data?.url) window.location.assign(result.data.url);
+};
+
+const signInCancelPath = (path: string) => {
+  if (!path.includes('?save=')) return path;
+  return `${path}&cancel=1`;
+};
+
+const getSafeSignInReturn = (path: string) => {
+  const appReturn = /^\/m2rd\/(?:\?save=[a-f0-9-]{36})?$/i.test(path);
+  const snapshotReturn = /^\/m2rd\/[a-f0-9]+-[a-f0-9]{40}$/i.test(path);
+  const allowedPath = appReturn || snapshotReturn;
+  return allowedPath ? path : '/m2rd/';
+};

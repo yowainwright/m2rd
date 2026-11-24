@@ -160,6 +160,134 @@ export function getCanvasLayers(canvas: GraphCanvasSettings) {
   return { canvasBackground, backgroundGrid };
 }
 
+export function GraphCanvas(props: GraphCanvasProps) {
+  return (
+    <ReactFlowErrorGate onError={handleReactFlowError}>
+      <GraphFlowContent {...props} />
+    </ReactFlowErrorGate>
+  );
+}
+
+export function ReactFlowErrorGate({ children, onError }: ReactFlowErrorGateProps) {
+  const store = useStoreApi();
+  const isReady = useStore((state) => state.onError === onError);
+
+  useEffect(() => {
+    store.setState({ onError });
+  }, [onError, store]);
+
+  if (!isReady) return null;
+  return children;
+}
+
+export function InitialViewportSync() {
+  const { send } = AppContext.useActorRef();
+  const store = useStoreApi();
+  const isInitialized = useStore((state) => {
+    const hasViewport = state.d3Zoom !== null;
+    const hasFitView = !state.fitViewOnInit || state.fitViewOnInitDone;
+    return hasViewport && hasFitView;
+  });
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    const [x, y, zoom] = store.getState().transform;
+    send({ type: 'viewport.update', viewport: { x, y, zoom } });
+  }, [isInitialized, send, store]);
+
+  return null;
+}
+
+export function RenderToolkit({
+  canEditDraft,
+  canvasTools,
+  edgeTools,
+  nodeTools,
+  nodeToolsSeparator,
+  onOpenChange,
+  open,
+  metadata,
+}: RenderToolkitProps) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <RenderToolkitTrigger />
+      <PopoverContent
+        align="end"
+        aria-label={TOOLKIT_LABELS.title}
+        className="w-80 max-h-(--radix-popover-content-available-height) overflow-y-auto bg-background p-3 pb-5 text-foreground"
+      >
+        <fieldset disabled={!canEditDraft} className="grid gap-3">
+          <ToolkitMetadata {...metadata} />
+          <Separator />
+          {canvasTools}
+          <Separator />
+          {nodeTools}
+          {nodeToolsSeparator}
+          {edgeTools}
+        </fieldset>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export const createRenderActions = (send: RenderSend) => {
+  const nodeActions = createNodeActions(send);
+  const edgeActions = createEdgeActions(send);
+  const canvasActions = createCanvasActions(send);
+  const handleToolkit = (open: boolean) => send({ type: 'toolkit.update', open });
+  const handleNodes = (changes: NodeChange[]) => send({ type: 'nodes.update', changes });
+  const handleEdges = (changes: EdgeChange[]) => send({ type: 'edges.update', changes });
+  const handleLayout = () => send({ type: 'layout.reset' });
+  const handleViewportBack = () => send({ type: 'viewport.back' });
+  const handleViewportForward = () => send({ type: 'viewport.forward' });
+  const handleViewport = (_event: MouseEvent | TouchEvent, viewport: Viewport) =>
+    send({ type: 'viewport.update', viewport });
+  return Object.assign({}, nodeActions, edgeActions, canvasActions, {
+    handleToolkit,
+    handleNodes,
+    handleEdges,
+    handleLayout,
+    handleViewportBack,
+    handleViewportForward,
+    handleViewport,
+  });
+};
+
+function GraphFlowContent(props: GraphCanvasProps) {
+  return (
+    <ReactFlow
+      defaultViewport={props.savedViewport}
+      deleteKeyCode={props.canvasDeleteKey}
+      edges={props.edges}
+      edgeTypes={RENDER_EDGE_TYPES}
+      edgesFocusable={props.canEditCanvas}
+      edgesUpdatable={props.canEditCanvas}
+      elementsSelectable={props.canEditCanvas}
+      fitView={props.shouldFitView}
+      minZoom={RENDER_MIN_ZOOM}
+      nodes={props.nodes}
+      nodeTypes={RENDER_NODE_TYPES}
+      nodesConnectable={props.canEditCanvas}
+      nodesDraggable={props.canEditCanvas}
+      nodesFocusable={props.canEditCanvas}
+      onEdgesChange={props.onEdgesChange}
+      onError={handleReactFlowError}
+      onMoveEnd={props.onMoveEnd}
+      onNodesChange={props.onNodesChange}
+      proOptions={RENDER_PRO_OPTIONS}
+      snapGrid={CANVAS_GRID}
+      snapToGrid={props.snapToGrid}
+    >
+      <InitialViewportSync />
+      <SelectedNodeIndicator selectedNodeId={props.selectedNodeId} />
+      <SelectedEdgeIndicator selectedEdgeAnchor={props.selectedEdgeAnchor} />
+      {props.background}
+      {props.backgroundGrid}
+      <Controls showInteractive={false} />
+    </ReactFlow>
+  );
+}
+
 function SelectedNodeIndicator({ selectedNodeId }: Pick<GraphCanvasProps, 'selectedNodeId'>) {
   if (!selectedNodeId) return null;
   return (
@@ -204,79 +332,6 @@ function SelectedEdgeIndicator({
   );
 }
 
-function GraphFlowContent(props: GraphCanvasProps) {
-  return (
-    <ReactFlow
-      defaultViewport={props.savedViewport}
-      deleteKeyCode={props.canvasDeleteKey}
-      edges={props.edges}
-      edgeTypes={RENDER_EDGE_TYPES}
-      edgesFocusable={props.canEditCanvas}
-      edgesUpdatable={props.canEditCanvas}
-      elementsSelectable={props.canEditCanvas}
-      fitView={props.shouldFitView}
-      minZoom={RENDER_MIN_ZOOM}
-      nodes={props.nodes}
-      nodeTypes={RENDER_NODE_TYPES}
-      nodesConnectable={props.canEditCanvas}
-      nodesDraggable={props.canEditCanvas}
-      nodesFocusable={props.canEditCanvas}
-      onEdgesChange={props.onEdgesChange}
-      onError={handleReactFlowError}
-      onMoveEnd={props.onMoveEnd}
-      onNodesChange={props.onNodesChange}
-      proOptions={RENDER_PRO_OPTIONS}
-      snapGrid={CANVAS_GRID}
-      snapToGrid={props.snapToGrid}
-    >
-      <InitialViewportSync />
-      <SelectedNodeIndicator selectedNodeId={props.selectedNodeId} />
-      <SelectedEdgeIndicator selectedEdgeAnchor={props.selectedEdgeAnchor} />
-      {props.background}
-      {props.backgroundGrid}
-      <Controls showInteractive={false} />
-    </ReactFlow>
-  );
-}
-
-export function GraphCanvas(props: GraphCanvasProps) {
-  return (
-    <ReactFlowErrorGate onError={handleReactFlowError}>
-      <GraphFlowContent {...props} />
-    </ReactFlowErrorGate>
-  );
-}
-
-export function ReactFlowErrorGate({ children, onError }: ReactFlowErrorGateProps) {
-  const store = useStoreApi();
-  const isReady = useStore((state) => state.onError === onError);
-
-  useEffect(() => {
-    store.setState({ onError });
-  }, [onError, store]);
-
-  if (!isReady) return null;
-  return children;
-}
-
-export function InitialViewportSync() {
-  const { send } = AppContext.useActorRef();
-  const store = useStoreApi();
-  const isInitialized = useStore((state) => {
-    const hasViewport = state.d3Zoom !== null;
-    const hasFitView = !state.fitViewOnInit || state.fitViewOnInitDone;
-    return hasViewport && hasFitView;
-  });
-
-  useEffect(() => {
-    if (!isInitialized) return;
-    const [x, y, zoom] = store.getState().transform;
-    send({ type: 'viewport.update', viewport: { x, y, zoom } });
-  }, [isInitialized, send, store]);
-
-  return null;
-}
-
 function RenderToolkitTrigger() {
   return (
     <Tooltip>
@@ -300,37 +355,59 @@ function RenderToolkitTrigger() {
   );
 }
 
-export function RenderToolkit({
-  canEditDraft,
-  canvasTools,
-  edgeTools,
-  nodeTools,
-  nodeToolsSeparator,
-  onOpenChange,
-  open,
-  metadata,
-}: RenderToolkitProps) {
-  return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <RenderToolkitTrigger />
-      <PopoverContent
-        align="end"
-        aria-label={TOOLKIT_LABELS.title}
-        className="w-80 max-h-(--radix-popover-content-available-height) overflow-y-auto bg-background p-3 pb-5 text-foreground"
-      >
-        <fieldset disabled={!canEditDraft} className="grid gap-3">
-          <ToolkitMetadata {...metadata} />
-          <Separator />
-          {canvasTools}
-          <Separator />
-          {nodeTools}
-          {nodeToolsSeparator}
-          {edgeTools}
-        </fieldset>
-      </PopoverContent>
-    </Popover>
-  );
-}
+const createCanvasActions = (send: RenderSend) => {
+  const update = (settings: Partial<GraphCanvasSettings>) =>
+    send({ type: 'canvas.update', settings });
+  const handleBackground = (value: string) => {
+    const option = CANVAS_BACKGROUND_OPTIONS.find((item) => item.value === value);
+    if (option) update({ background: option.value });
+  };
+  const handleGrid = (gridVisible: boolean) => update({ gridVisible });
+  const handleGradient = (gradient: GraphGradientSettings) => update({ gradient });
+  const handlePattern = (pattern: GraphPatternSettings) => update({ pattern });
+  const handleShader = (shader: GraphShaderSettings) => update({ shader });
+  const handleSnap = (snapToGrid: boolean) => update({ snapToGrid });
+  const handleLock = (locked: boolean) => update({ locked });
+  return {
+    handleBackground,
+    handleGrid,
+    handleGradient,
+    handlePattern,
+    handleShader,
+    handleSnap,
+    handleLock,
+  };
+};
+
+const createEdgeActions = (send: RenderSend) => {
+  const update = (settings: Partial<TranslationSettings>) =>
+    send({ type: 'edges.style', settings });
+  const handleColor = (event: ChangeEvent<HTMLInputElement>) =>
+    update({ edgeColor: event.target.value });
+  const handleWidth = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = Number(event.target.value);
+    if (Number.isFinite(value)) update({ edgeWidth: clampEdgeWidth(value) });
+  };
+  const handleType = (value: string) => {
+    const type = EDGE_TYPE_OPTIONS.find((item) => item.value === value);
+    if (type) update({ edgeType: type.value });
+  };
+  const handleMarker = (value: string) => {
+    const marker = EDGE_MARKER_OPTIONS.find((item) => item.value === value);
+    if (marker) update({ edgeMarker: marker.value });
+  };
+  const handleAnimation = (value: string) => {
+    const animation = EDGE_ANIMATION_OPTIONS.find((item) => item.value === value);
+    if (animation) update({ edgeAnimation: animation.value });
+  };
+  return {
+    handleEdgeColor: handleColor,
+    handleEdgeWidth: handleWidth,
+    handleEdgeType: handleType,
+    handleEdgeMarker: handleMarker,
+    handleEdgeAnimation: handleAnimation,
+  };
+};
 
 const createNodeActions = (send: RenderSend) => {
   const update = (settings: Partial<TranslationSettings>) =>
@@ -365,81 +442,4 @@ const createNodeActions = (send: RenderSend) => {
     handleNodeSurface: handleSurface,
     handleNodeGradient: handleGradient,
   };
-};
-
-const createEdgeActions = (send: RenderSend) => {
-  const update = (settings: Partial<TranslationSettings>) =>
-    send({ type: 'edges.style', settings });
-  const handleColor = (event: ChangeEvent<HTMLInputElement>) =>
-    update({ edgeColor: event.target.value });
-  const handleWidth = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value)) update({ edgeWidth: clampEdgeWidth(value) });
-  };
-  const handleType = (value: string) => {
-    const type = EDGE_TYPE_OPTIONS.find((item) => item.value === value);
-    if (type) update({ edgeType: type.value });
-  };
-  const handleMarker = (value: string) => {
-    const marker = EDGE_MARKER_OPTIONS.find((item) => item.value === value);
-    if (marker) update({ edgeMarker: marker.value });
-  };
-  const handleAnimation = (value: string) => {
-    const animation = EDGE_ANIMATION_OPTIONS.find((item) => item.value === value);
-    if (animation) update({ edgeAnimation: animation.value });
-  };
-  return {
-    handleEdgeColor: handleColor,
-    handleEdgeWidth: handleWidth,
-    handleEdgeType: handleType,
-    handleEdgeMarker: handleMarker,
-    handleEdgeAnimation: handleAnimation,
-  };
-};
-
-const createCanvasActions = (send: RenderSend) => {
-  const update = (settings: Partial<GraphCanvasSettings>) =>
-    send({ type: 'canvas.update', settings });
-  const handleBackground = (value: string) => {
-    const option = CANVAS_BACKGROUND_OPTIONS.find((item) => item.value === value);
-    if (option) update({ background: option.value });
-  };
-  const handleGrid = (gridVisible: boolean) => update({ gridVisible });
-  const handleGradient = (gradient: GraphGradientSettings) => update({ gradient });
-  const handlePattern = (pattern: GraphPatternSettings) => update({ pattern });
-  const handleShader = (shader: GraphShaderSettings) => update({ shader });
-  const handleSnap = (snapToGrid: boolean) => update({ snapToGrid });
-  const handleLock = (locked: boolean) => update({ locked });
-  return {
-    handleBackground,
-    handleGrid,
-    handleGradient,
-    handlePattern,
-    handleShader,
-    handleSnap,
-    handleLock,
-  };
-};
-
-export const createRenderActions = (send: RenderSend) => {
-  const nodeActions = createNodeActions(send);
-  const edgeActions = createEdgeActions(send);
-  const canvasActions = createCanvasActions(send);
-  const handleToolkit = (open: boolean) => send({ type: 'toolkit.update', open });
-  const handleNodes = (changes: NodeChange[]) => send({ type: 'nodes.update', changes });
-  const handleEdges = (changes: EdgeChange[]) => send({ type: 'edges.update', changes });
-  const handleLayout = () => send({ type: 'layout.reset' });
-  const handleViewportBack = () => send({ type: 'viewport.back' });
-  const handleViewportForward = () => send({ type: 'viewport.forward' });
-  const handleViewport = (_event: MouseEvent | TouchEvent, viewport: Viewport) =>
-    send({ type: 'viewport.update', viewport });
-  return Object.assign({}, nodeActions, edgeActions, canvasActions, {
-    handleToolkit,
-    handleNodes,
-    handleEdges,
-    handleLayout,
-    handleViewportBack,
-    handleViewportForward,
-    handleViewport,
-  });
 };

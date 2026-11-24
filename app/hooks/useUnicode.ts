@@ -2,19 +2,17 @@ import * as React from 'react';
 
 import type { UnicodeContextValue } from '@/app/components/ui/types';
 
-const getEnv = (name: string): string | undefined => {
-  const hasEnvironment = typeof process !== 'undefined' && process.env;
-  if (!hasEnvironment) return undefined;
-  return process.env[name];
-};
+export const UnicodeContext = React.createContext<UnicodeContextValue>({
+  unicode: !isNoUnicode(),
+});
 
-const getPlatform = () => {
-  const hasPlatform = typeof process !== 'undefined' && process.platform;
-  if (!hasPlatform) return 'browser';
-  return process.platform;
-};
+export function isNoUnicode(): boolean {
+  return !detectUnicodeSupport();
+}
 
-const detectUnicodeSupport = (): boolean => {
+export const useUnicode = (): boolean => React.useContext(UnicodeContext).unicode;
+
+function detectUnicodeSupport(): boolean {
   if (typeof window !== 'undefined') {
     return true;
   }
@@ -45,12 +43,16 @@ const detectUnicodeSupport = (): boolean => {
   }
 
   return true;
-};
+}
 
-export const isNoUnicode = (): boolean => !detectUnicodeSupport();
+function getPlatform() {
+  const hasPlatform = typeof process !== 'undefined' && process.platform;
+  if (!hasPlatform) return 'browser';
+  return process.platform;
+}
 
-export const UnicodeContext = React.createContext<UnicodeContextValue>({
-  unicode: !isNoUnicode(),
-});
-
-export const useUnicode = (): boolean => React.useContext(UnicodeContext).unicode;
+function getEnv(name: string): string | undefined {
+  const hasEnvironment = typeof process !== 'undefined' && process.env;
+  if (!hasEnvironment) return undefined;
+  return process.env[name];
+}

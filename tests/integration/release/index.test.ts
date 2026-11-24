@@ -1,25 +1,29 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../..');
+const cache = resolve(root, '.next/cache');
 const workflow = readFileSync(resolve(root, '.github/workflows/gh-pages.yml'), 'utf8');
 const block = workflow.match(
   /      - name: Resolve release revision[\s\S]*?        run: \|\n((?:          .*\n)+)/,
 );
 if (!block) throw new Error('Release revision step is missing');
 const script = block[1].replace(/^ {10}/gm, '');
-const gitStub = `git() {
+const gitStub = `jq() { return 127; }
+git() {
   case "$1" in
     log) printf '%s' "$MOCK_RELEASE" ;;
     rev-parse) printf '%s' "$MOCK_HEAD" ;;
+    show) printf '%s' '{"version":"0.0.18"}' ;;
     *) return 1 ;;
   esac
 }`;
 
 const resolveRevision = (event: string, released = '', head = 'checked-main') => {
-  const directory = mkdtempSync(resolve(root, '.next/cache/release-test-'));
+  mkdirSync(cache, { recursive: true });
+  const directory = mkdtempSync(resolve(cache, 'release-test-'));
   const outputFile = resolve(directory, 'output');
   const env = Object.assign({}, process.env, {
     EVENT_NAME: event,
@@ -52,7 +56,7 @@ test('queues a patch for a new main push using the revision that checks will val
 test('reuses the recorded release on a retry without bumping again', () => {
   expect(resolveRevision('push', 'release-sha', 'release-sha')).toEqual({
     status: 0,
-    output: 'sha=release-sha\nbump=false\n',
+    output: 'sha=release-sha\nbump=false\ntag=v0.0.18\n',
   });
 });
 

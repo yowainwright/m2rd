@@ -13,6 +13,20 @@ import { Separator } from '@/app/components/ui/separator';
 import { STATE_GROUPS, STATE_HANDLE_STYLE, STATE_SYMBOLS } from '@/app/graph/state/constants';
 import type { StateEdgeData, StateNodeData, StatePoint } from '@/app/graph/state/types';
 
+export function StateDiagramNode({ id, data }: NodeProps<StateNodeData>) {
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => updateNodeInternals(id), [data.handles, id, updateNodeInternals]);
+  const style = getStateSurface(data);
+  return (
+    <>
+      <Card style={style} data-state-shape={data.shape}>
+        <StateContent data={data} />
+      </Card>
+      <StateHandles data={data} />
+    </>
+  );
+}
+
 export function StateHandles({ data }: { data: Pick<StateNodeData, 'handles'> }) {
   return data.handles.map((handle) => {
     const style = Object.assign({}, STATE_HANDLE_STYLE, {
@@ -34,6 +48,72 @@ export function StateHandles({ data }: { data: Pick<StateNodeData, 'handles'> })
     );
   });
 }
+
+export function StateTransitionEdge(props: EdgeProps<StateEdgeData>) {
+  const route = getStateEdgePath(props);
+  const strokeDasharray = props.data?.dashed ? '5 4' : undefined;
+  const markerEnd = props.data?.arrow ? props.markerEnd : undefined;
+  const style = Object.assign({}, props.style, { strokeDasharray });
+  return (
+    <BaseEdge
+      id={props.id}
+      {...route}
+      label={props.label}
+      markerEnd={markerEnd}
+      style={style}
+      interactionWidth={props.interactionWidth}
+      labelStyle={props.labelStyle}
+      labelShowBg
+    />
+  );
+}
+
+export const getStateSurface = (data: StateNodeData): CSSProperties => {
+  const style = getStateAppearance(data);
+  if (STATE_SYMBOLS.has(data.shape))
+    return {
+      color: style.backgroundColor,
+      width: '100%',
+      height: '100%',
+      border: 0,
+      background: 'transparent',
+      boxShadow: 'none',
+    };
+  if (data.shape === 'noteGroup')
+    return {
+      width: '100%',
+      height: '100%',
+      border: 0,
+      background: 'transparent',
+      boxShadow: 'none',
+    };
+  const isRegion = data.shape === 'divider';
+  const isComposite = data.shape === 'roundedWithTitle';
+  const borderStyle = isRegion ? 'dashed' : style.borderStyle;
+  const borderWidth = isRegion || isComposite ? 1 : style.borderWidth;
+  return Object.assign({}, style, { borderRadius: 6, borderStyle, borderWidth });
+};
+
+export const getStateEdgePath = <T extends Pick<StateEdgeData, 'points'>>(props: EdgeProps<T>) => {
+  const points = getRoutedPoints(props);
+  const path = points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`)
+    .join(' ');
+  const middle = (points.length - 1) / 2;
+  const before = points[Math.floor(middle)];
+  const after = points[Math.ceil(middle)];
+  const labelX = (before.x + after.x) / 2;
+  const labelY = (before.y + after.y) / 2;
+  return { path, labelX, labelY };
+};
+
+export const getRoutedPoints = (props: EdgeProps<Pick<StateEdgeData, 'points'>>) => {
+  const original = props.data?.points || [
+    { x: props.sourceX, y: props.sourceY },
+    { x: props.targetX, y: props.targetY },
+  ];
+  return original.map((point, index) => offsetPoint(point, index, original, props));
+};
 
 function StateContent({ data }: Pick<NodeProps<StateNodeData>, 'data'>) {
   if (STATE_SYMBOLS.has(data.shape))
@@ -63,39 +143,6 @@ function StateContent({ data }: Pick<NodeProps<StateNodeData>, 'data'>) {
   );
 }
 
-export function StateDiagramNode({ id, data }: NodeProps<StateNodeData>) {
-  const updateNodeInternals = useUpdateNodeInternals();
-  useEffect(() => updateNodeInternals(id), [data.handles, id, updateNodeInternals]);
-  const style = getStateSurface(data);
-  return (
-    <>
-      <Card style={style} data-state-shape={data.shape}>
-        <StateContent data={data} />
-      </Card>
-      <StateHandles data={data} />
-    </>
-  );
-}
-
-export function StateTransitionEdge(props: EdgeProps<StateEdgeData>) {
-  const route = getStateEdgePath(props);
-  const strokeDasharray = props.data?.dashed ? '5 4' : undefined;
-  const markerEnd = props.data?.arrow ? props.markerEnd : undefined;
-  const style = Object.assign({}, props.style, { strokeDasharray });
-  return (
-    <BaseEdge
-      id={props.id}
-      {...route}
-      label={props.label}
-      markerEnd={markerEnd}
-      style={style}
-      interactionWidth={props.interactionWidth}
-      labelStyle={props.labelStyle}
-      labelShowBg
-    />
-  );
-}
-
 const getStateAppearance = (data: StateNodeData): CSSProperties => {
   const {
     width: _width,
@@ -117,32 +164,6 @@ const getStateAppearance = (data: StateNodeData): CSSProperties => {
     minHeight: 0,
     padding: 0,
   });
-};
-
-export const getStateSurface = (data: StateNodeData): CSSProperties => {
-  const style = getStateAppearance(data);
-  if (STATE_SYMBOLS.has(data.shape))
-    return {
-      color: style.backgroundColor,
-      width: '100%',
-      height: '100%',
-      border: 0,
-      background: 'transparent',
-      boxShadow: 'none',
-    };
-  if (data.shape === 'noteGroup')
-    return {
-      width: '100%',
-      height: '100%',
-      border: 0,
-      background: 'transparent',
-      boxShadow: 'none',
-    };
-  const isRegion = data.shape === 'divider';
-  const isComposite = data.shape === 'roundedWithTitle';
-  const borderStyle = isRegion ? 'dashed' : style.borderStyle;
-  const borderWidth = isRegion || isComposite ? 1 : style.borderWidth;
-  return Object.assign({}, style, { borderRadius: 6, borderStyle, borderWidth });
 };
 
 function StateSymbol({ shape }: Pick<StateNodeData, 'shape'>) {
@@ -176,25 +197,4 @@ const offsetPoint = (
   const x = point.x + shiftX;
   const y = point.y + shiftY;
   return { x, y };
-};
-
-export const getRoutedPoints = (props: EdgeProps<Pick<StateEdgeData, 'points'>>) => {
-  const original = props.data?.points || [
-    { x: props.sourceX, y: props.sourceY },
-    { x: props.targetX, y: props.targetY },
-  ];
-  return original.map((point, index) => offsetPoint(point, index, original, props));
-};
-
-export const getStateEdgePath = <T extends Pick<StateEdgeData, 'points'>>(props: EdgeProps<T>) => {
-  const points = getRoutedPoints(props);
-  const path = points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`)
-    .join(' ');
-  const middle = (points.length - 1) / 2;
-  const before = points[Math.floor(middle)];
-  const after = points[Math.ceil(middle)];
-  const labelX = (before.x + after.x) / 2;
-  const labelY = (before.y + after.y) / 2;
-  return { path, labelX, labelY };
 };

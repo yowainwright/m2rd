@@ -18,15 +18,14 @@ const redactObjectPaths = createRedactor({
   strict: false,
 });
 
-const isRecord = (value: unknown): value is RedactableRecord => {
-  const hasValue = value !== null;
-  const isObject = typeof value === 'object';
+export const redactTelemetry = (value: unknown) => {
+  if (!isRecord(value)) {
+    return redactValue(value, new WeakSet());
+  }
 
-  return hasValue && isObject;
-};
+  const redactedObjectPaths = redactObjectPaths(value);
 
-const isSensitiveField = (key: string) => {
-  return normalizedSensitiveFieldNames.has(key.toLowerCase());
+  return redactValue(redactedObjectPaths, new WeakSet());
 };
 
 export const redactString = (value: string) => {
@@ -34,6 +33,28 @@ export const redactString = (value: string) => {
     (redactedValue, item) => redactedValue.replace(item.pattern, item.replacement),
     value,
   );
+};
+
+const redactValue = (value: unknown, seen: WeakSet<object>): unknown => {
+  if (typeof value === 'string') {
+    return redactString(value);
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  if (seen.has(value)) {
+    return REDACTED_VALUE;
+  }
+
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return redactArray(value, seen);
+  }
+
+  return redactRecord(value, seen);
 };
 
 const redactArray = (value: unknown[], seen: WeakSet<object>) => {
@@ -64,34 +85,13 @@ const redactRecord = (value: RedactableRecord, seen: WeakSet<object>) => {
   );
 };
 
-const redactValue = (value: unknown, seen: WeakSet<object>): unknown => {
-  if (typeof value === 'string') {
-    return redactString(value);
-  }
-
-  if (!isRecord(value)) {
-    return value;
-  }
-
-  if (seen.has(value)) {
-    return REDACTED_VALUE;
-  }
-
-  seen.add(value);
-
-  if (Array.isArray(value)) {
-    return redactArray(value, seen);
-  }
-
-  return redactRecord(value, seen);
+const isSensitiveField = (key: string) => {
+  return normalizedSensitiveFieldNames.has(key.toLowerCase());
 };
 
-export const redactTelemetry = (value: unknown) => {
-  if (!isRecord(value)) {
-    return redactValue(value, new WeakSet());
-  }
+const isRecord = (value: unknown): value is RedactableRecord => {
+  const hasValue = value !== null;
+  const isObject = typeof value === 'object';
 
-  const redactedObjectPaths = redactObjectPaths(value);
-
-  return redactValue(redactedObjectPaths, new WeakSet());
+  return hasValue && isObject;
 };
