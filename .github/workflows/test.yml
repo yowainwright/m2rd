@@ -11,11 +11,13 @@ on:
         description: Upload the tested static site for deployment
         type: boolean
         default: false
-      patch-version:
-        description: Build the site with the upcoming patch release version
-        type: boolean
-        default: false
+      increment:
+        description: Version increment for the upcoming site release
+        type: string
+        default: ''
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
 
 permissions:
@@ -96,8 +98,10 @@ jobs:
         run: pnpm run lint:ci
 
       - name: Prepare site release version
-        if: inputs.patch-version
-        run: npm version patch --no-git-tag-version --ignore-scripts
+        if: inputs.increment != ''
+        env:
+          INCREMENT: ${{ inputs.increment }}
+        run: npm version "$INCREMENT" --no-git-tag-version --ignore-scripts
 
       - name: Check build
         env:

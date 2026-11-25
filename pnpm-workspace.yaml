@@ -2,6 +2,7 @@ packages:
   - packages/*
 
 allowBuilds:
+  '@modelcontextprotocol/inspector': false
   better-sqlite3@13.2.0: true
 
 overrides:

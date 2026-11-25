@@ -1,9 +1,9 @@
 # m2rd
 
-<!-- Workflow badges from .github/workflows/test.yml and .github/workflows/gh-pages.yml -->
+<!-- Workflow badges from .github/workflows/test.yml and .github/workflows/release.yml -->
 
 [![PR checks](https://github.com/yowainwright/m2rd/actions/workflows/test.yml/badge.svg?event=pull_request)](https://github.com/yowainwright/m2rd/actions/workflows/test.yml)
-[![Deploy GitHub Pages](https://github.com/yowainwright/m2rd/actions/workflows/gh-pages.yml/badge.svg?branch=main)](https://github.com/yowainwright/m2rd/actions/workflows/gh-pages.yml)
+[![Release m2rd](https://github.com/yowainwright/m2rd/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/yowainwright/m2rd/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 m2rd, mermaid to react diagram, is built render mermaid within terminal and web app.
@@ -51,6 +51,25 @@ You will observe a basic mermaid chart in the Terminal.
 That's it!
 
 ---
+
+## Release the CLI
+
+Choose one command to release from `main`.
+
+- `pnpm run release:patch` for a bug fix
+- `pnpm run release:minor` for a backward-compatible feature
+- `pnpm run release:major` for a breaking change
+
+From a clean `main` checkout, `pnpm run release:dry` previews a patch. GitHub Actions tests the selected revision, tags the requested version, and publishes the same attested `m2rd` tarball to GitHub Releases and npm. It opens a formula PR in `yowainwright/homebrew-tap` and deploys the website. Merge the tap PR to make the version available through Homebrew.
+
+For initial setup, create the GitHub environment `npm` with a single deployment rule allowing the branch `main`. The npm package owner must control the public name `m2rd`. For a new package, npm supports reserving the name by staging a first tarball. [npm first-publish instructions](https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages/)
+
+```sh
+npm trust github m2rd --repo yowainwright/m2rd --file release.yml --env npm --allow-publish
+npm trust list m2rd
+```
+
+In npm package settings, select **Require two-factor authentication and disallow tokens**. The publish job uses GitHub OIDC. The tap PR uses the separate `HOMEBREW_TAP_TOKEN` with contents and pull-request write access to the tap. [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 
 ## Share a graph
 

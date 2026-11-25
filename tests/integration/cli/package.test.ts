@@ -26,7 +26,7 @@ const installation = resolve(directory, 'install');
 
 const project = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 
-const installed = resolve(installation, 'node_modules', project.name);
+const installed = resolve(installation, 'node_modules', 'm2rd');
 
 const cli = resolve(installation, 'node_modules/.bin/m2rd');
 
@@ -61,8 +61,9 @@ afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
 test('installs an npm command without runtime dependencies or lifecycle scripts', () => {
   const manifest = JSON.parse(readFileSync(resolve(installed, 'package.json'), 'utf8'));
-  expect(manifest.name).toBe(project.name);
+  expect(manifest.name).toBe('m2rd');
   expect(manifest.version).toBe(project.version);
+  expect(manifest.private).not.toBe(true);
   expect(manifest.dependencies ?? {}).toEqual({});
   expect(manifest.optionalDependencies ?? {}).toEqual({});
   expect(manifest.peerDependencies ?? {}).toEqual({});

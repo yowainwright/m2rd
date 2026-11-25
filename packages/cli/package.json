@@ -1,5 +1,5 @@
 {
-  "name": "@m2rd/cli",
+  "name": "m2rd",
   "private": true,
   "type": "module",
   "scripts": {

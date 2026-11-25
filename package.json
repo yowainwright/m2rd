@@ -1,5 +1,5 @@
 {
-  "name": "m2rd",
+  "name": "m2rd-root",
   "version": "0.0.19",
   "private": true,
   "description": "m2rd — Mermaid to React Diagrams",
@@ -21,14 +21,17 @@
   "scripts": {
     "cli": "node packages/cli/dist/m2rd-cli.mjs",
     "preview:styleguide": "pnpm run cli:build && node packages/cli/dist/m2rd-cli.mjs --styleguide",
-    "cli:build": "pnpm --filter @m2rd/cli run build",
-    "cli:pack": "pnpm --filter @m2rd/cli run pack",
+    "cli:build": "pnpm --filter m2rd run build",
+    "cli:pack": "pnpm --filter m2rd run pack",
     "dev": "printf '\\n  App: http://localhost:%s/m2rd/\\n\\n' \"${M2RD_APP_PORT:-54783}\" && next dev --port ${M2RD_APP_PORT:-54783}",
-    "server:build": "pnpm --filter @m2rd/server run build",
-    "server:start": "pnpm --filter @m2rd/server run start",
+    "server:build": "pnpm --filter m2rd-mcp run build",
+    "server:start": "pnpm --filter m2rd-mcp run start",
     "build": "next build --webpack",
     "preview": "mkdir -p .next/cache/pages && ln -sfn ../../../out .next/cache/pages/m2rd && python3 -m http.server ${M2RD_PREVIEW_PORT:-54784} --bind 127.0.0.1 --directory .next/cache/pages",
-    "release": "release-it patch",
+    "release": "pnpm run release:patch",
+    "release:patch": "gh workflow run release.yml --repo yowainwright/m2rd --ref main -f increment=patch",
+    "release:minor": "gh workflow run release.yml --repo yowainwright/m2rd --ref main -f increment=minor",
+    "release:major": "gh workflow run release.yml --repo yowainwright/m2rd --ref main -f increment=major",
     "release:dry": "release-it patch --dry-run",
     "deps:check": "codependence",
     "deps:overrides": "pastoralist",
@@ -53,7 +56,7 @@
     "mcp:build": "docker build --tag m2rd-shadcn:4.21.2 tests/integration/mcp",
     "mcp:generate": "node scripts/mcp/index.ts",
     "mcp:check": "node scripts/mcp/index.ts && mcp-inspector --cli --config .agents/mcp/shadcn.json --server shadcn --method tools/list",
-    "typecheck": "pnpm run typecheck:mcp && tsc --noEmit && pnpm --filter @m2rd/server run typecheck",
+    "typecheck": "pnpm run typecheck:mcp && tsc --noEmit && pnpm --filter m2rd-mcp run typecheck",
     "typecheck:mcp": "tsc --ignoreConfig --noEmit --module nodenext --target esnext --types node --allowImportingTsExtensions --skipLibCheck scripts/mcp/*.ts tests/unit/scripts/mcp/*.test.ts",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:e2e": "TMPDIR=.next/cache PLAYWRIGHT_LAST_RUN_OUTPUT_FILE=.next/cache/playwright/.last-run.json playwright test --config scripts/playwright.config.ts",
@@ -186,9 +189,9 @@
     "appendix": {
       "lodash-es@4.18.1": {
         "dependents": {
+          "m2rd-root": "lodash-es (required by mermaid)",
           "m2rd": "lodash-es (required by mermaid)",
-          "@m2rd/cli": "lodash-es (required by mermaid)",
-          "@m2rd/server": "lodash-es (required by mermaid)"
+          "m2rd-mcp": "lodash-es (required by mermaid)"
         },
         "ledger": {
           "addedDate": "2026-11-24T06:01:57.286Z",
@@ -198,9 +201,9 @@
       },
       "undici@7.29.0@7.30.2": {
         "dependents": {
+          "m2rd-root": "undici@7.29.0 (transitive dependency)",
           "m2rd": "undici@7.29.0 (transitive dependency)",
-          "@m2rd/cli": "undici@7.29.0 (transitive dependency)",
-          "@m2rd/server": "undici@7.29.0 (transitive dependency)"
+          "m2rd-mcp": "undici@7.29.0 (transitive dependency)"
         },
         "ledger": {
           "addedDate": "2026-11-24T06:01:57.286Z",
@@ -222,7 +225,7 @@
       },
       "basic-ftp@6.2.4": {
         "dependents": {
-          "m2rd": "basic-ftp (required by release-it)"
+          "m2rd-root": "basic-ftp (required by release-it)"
         },
         "ledger": {
           "addedDate": "2026-11-14T07:34:20.588Z",
@@ -259,9 +262,9 @@
       },
       "source-map-js@1.2.2": {
         "dependents": {
-          "m2rd": "source-map-js (required by @better-auth/oauth-provider, @modelcontextprotocol/inspector, @tailwindcss/postcss)",
-          "@m2rd/cli": "source-map-js (required by jsdom)",
-          "@m2rd/server": "source-map-js (required by @better-auth/cimd, @better-auth/mcp, @better-auth/oauth-provider)"
+          "m2rd-root": "source-map-js (required by @better-auth/oauth-provider, @modelcontextprotocol/inspector, @tailwindcss/postcss)",
+          "m2rd": "source-map-js (required by jsdom)",
+          "m2rd-mcp": "source-map-js (required by @better-auth/cimd, @better-auth/mcp, @better-auth/oauth-provider)"
         },
         "ledger": {
           "addedDate": "2026-11-24T06:01:57.286Z",
@@ -292,9 +295,9 @@
       },
       "katex@0.19.0": {
         "dependents": {
+          "m2rd-root": "katex (required by mermaid)",
           "m2rd": "katex (required by mermaid)",
-          "@m2rd/cli": "katex (required by mermaid)",
-          "@m2rd/server": "katex (required by mermaid)"
+          "m2rd-mcp": "katex (required by mermaid)"
         },
         "ledger": {
           "addedDate": "2026-11-24T06:01:57.286Z",
@@ -325,7 +328,7 @@
       },
       "minimatch@11.0.1": {
         "dependents": {
-          "m2rd": "minimatch (required by shadcn)"
+          "m2rd-root": "minimatch (required by shadcn)"
         },
         "ledger": {
           "addedDate": "2026-11-14T07:34:20.588Z",

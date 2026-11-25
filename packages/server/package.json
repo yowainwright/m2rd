@@ -1,6 +1,5 @@
 {
-  "name": "@m2rd/server",
-  "version": "0.0.18",
+  "name": "m2rd-mcp",
   "private": true,
   "type": "module",
   "scripts": {
