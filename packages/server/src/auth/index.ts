@@ -6,10 +6,9 @@ import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { jwt } from 'better-auth/plugins';
 import { Semaphore, Effect } from 'effect';
 import { openDatabase, fetchClientMetadataResource } from './utils';
-import type { GitHubAccess } from '../github/types';
-import type { ServerAuthOptions, VerifiedAccount } from './types';
-
-type AuthAdapter = Awaited<ReturnType<typeof createAuth>['$context']>['adapter'];
+import { clearExpiredGitHubTokens, githubProviderOptions } from './clients/github/utils';
+import { sessionLifetime } from './constants';
+import type { AuthAdapter, ServerAuthOptions, VerifiedAccount } from './types';
 
 const browserAuthDisabledPaths = [
   '/token',
@@ -24,10 +23,8 @@ const browserAuthDisabledPaths = [
   '/unlink-account',
 ];
 const authPath = '/api/auth';
-const sessionLifetime = 604_800;
 const accessLifetime = 900;
 const toolScope = 'mcp:tools';
-const githubProvider = 'github';
 const authMutation = Semaphore.makeUnsafe(1);
 const authCookiePaths = new Set([authPath + '/sign-out', authPath + '/oauth2/token']);
 
@@ -40,8 +37,6 @@ export const auth =
         secret: 'test-schema-generation-only-never-used-at-runtime',
         githubClientId: 'schema',
         githubClientSecret: 'schema',
-        verifierClientId: 'schema',
-        verifierClientSecret: 'schema',
       })
     : undefined;
 
@@ -78,6 +73,9 @@ export const protectMcp = (
   options: ServerAuthOptions,
   handler: (request: Request, account: VerifiedAccount) => Promise<Response>,
 ) => {
+  const { verifierClientId, verifierClientSecret } = options;
+  const missingVerifier = !verifierClientId || !verifierClientSecret;
+  if (missingVerifier) return undefined;
   const issuer = options.apiOrigin + authPath;
   const resource = options.apiOrigin + '/mcp';
   return createMcpProtectedRequestHandler(
@@ -88,8 +86,8 @@ export const protectMcp = (
       remoteVerify: {
         force: true,
         introspectUrl: issuer + '/oauth2/introspect',
-        clientId: options.verifierClientId,
-        clientSecret: options.verifierClientSecret,
+        clientId: verifierClientId,
+        clientSecret: verifierClientSecret,
       },
     },
     async (request, claims) => {
@@ -109,63 +107,11 @@ export const verifyBrowserAccount = async (
   return { id: result.user.id, sessionId: result.session.id };
 };
 
-export const getGitHubAccess = async (
-  server: ReturnType<typeof createAuth>,
-  account: VerifiedAccount,
-): Promise<GitHubAccess> => {
-  await assertLiveAccount(server, account);
-  const { internalAdapter, adapter } = await server.$context;
-  const accounts = await internalAdapter.findAccounts(account.id);
-  const github = accounts.find(({ providerId }) => providerId === githubProvider);
-  const deadline = Date.now() - sessionLifetime * 1000;
-  const available = github && github.updatedAt.getTime() > deadline;
-  if (!available) throw new APIError('UNAUTHORIZED', { message: 'Sign in with GitHub again.' });
-  const credentials = await server.api.getAccessToken({
-    body: { accountId: github.id, userId: account.id },
-  });
-  if (!credentials.scopes.includes('gist')) {
-    throw new APIError('FORBIDDEN', { message: 'The GitHub account must grant Gist permissions.' });
-  }
-  await adapter.update({
-    model: 'account',
-    where: [{ field: 'id', value: github.id }],
-    update: { updatedAt: new Date() },
-  });
-  return { token: credentials.accessToken, githubId: github.accountId };
-};
-
-export const assertLiveAccount = async (
-  server: ReturnType<typeof createAuth>,
-  account: VerifiedAccount,
-) => {
-  const { adapter } = await server.$context;
-  const session = await adapter.findOne<{ userId: string; expiresAt: Date }>({
-    model: 'session',
-    where: [{ field: 'id', value: account.sessionId }],
-  });
-  const active = session?.userId === account.id && session.expiresAt.getTime() > Date.now();
-  if (!active) throw new APIError('UNAUTHORIZED', { message: 'Sign in again.' });
-};
-
 export const cleanupAuth = async (server: ReturnType<typeof createAuth>) => {
   const task = authMutation.withPermitsIfAvailable(1)(
     Effect.tryPromise(async () => {
       const { adapter } = await server.$context;
-      const deadline = new Date(Date.now() - sessionLifetime * 1000);
-      await adapter.updateMany({
-        model: 'account',
-        where: [
-          { field: 'providerId', value: githubProvider },
-          { field: 'updatedAt', value: deadline, operator: 'lt' },
-        ],
-        update: {
-          accessToken: null,
-          refreshToken: null,
-          idToken: null,
-          accessTokenExpiresAt: null,
-          refreshTokenExpiresAt: null,
-        },
-      });
+      await clearExpiredGitHubTokens(adapter);
       await adapter.deleteMany({
         model: 'oauthAccessToken',
         where: [{ field: 'expiresAt', value: new Date(), operator: 'lt' }],
@@ -284,23 +230,6 @@ function getSessionOptions(options: ServerAuthOptions): BetterAuthOptions {
         },
       },
     },
-    socialProviders: githubOnly(options),
-  };
-}
-
-function githubOnly(options: ServerAuthOptions): BetterAuthOptions['socialProviders'] {
-  return {
-    github: {
-      clientId: options.githubClientId,
-      clientSecret: options.githubClientSecret,
-      disableDefaultScope: true,
-      scope: ['gist'],
-      mapProfileToUser: (profile) => ({
-        name: 'GitHub account',
-        email: `github-${profile.id}@m2rd.invalid`,
-        emailVerified: false,
-        image: undefined,
-      }),
-    },
+    socialProviders: githubProviderOptions(options),
   };
 }

@@ -38,9 +38,12 @@ test('starts fresh graphs with the install-check sequence without saving it', as
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.insertText('flowchart LR\n  A --> B');
   await expect(page.locator('.react-flow__node')).toHaveCount(2);
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('button', { name: 'Change diagram type: Flowchart' }).click();
   await page.getByRole('menuitem', { name: 'Sequence', exact: true }).click();
   await expect(participants).toHaveCount(5);
+  await expect(page.getByRole('button', { name: 'Change diagram type: Sequence' })).toHaveText(
+    'Sequence',
+  );
   await expect(editor).toContainText('Install command via shell hook');
   await expect(page.locator('[data-sidebar="menu-button"]')).toHaveCount(0);
 });

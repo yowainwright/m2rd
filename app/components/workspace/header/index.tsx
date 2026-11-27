@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import Image from 'next/image';
-import { Plus, Share2, Trash2 } from 'lucide-react';
+import { ChevronDown, Share2, Trash2 } from 'lucide-react';
 import { GRAPH_SAMPLES } from '@/app/constants';
 import type { GraphDiagramType } from '@/app/graph';
 import {
@@ -39,7 +39,7 @@ import type { ExportMenuProps, SaveControlProps } from './types';
 
 export function WorkspaceHeader() {
   return (
-    <header className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b px-4 py-2">
+    <header className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b px-2 py-2 sm:px-4">
       <HeaderBrand />
       <HeaderTitle />
       <HeaderActions />
@@ -63,7 +63,7 @@ function HeaderTitle() {
   useSaveShortcut(handleSave);
   return (
     <div className="col-span-3 row-start-2 flex min-w-0 items-center justify-center gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
-      <CreateControl />
+      <DiagramTypeControl />
       <WorkspaceTitle>
         <SaveControl canSave={canSave} saveLabel={saveLabel} onSave={handleSave} />
       </WorkspaceTitle>
@@ -108,12 +108,35 @@ function HeaderActions() {
     send({ type: 'export.start', request: { format, repeat } });
   };
   return (
-    <div className="col-start-3 row-start-1 flex items-center gap-2 justify-self-end">
+    <div className="col-start-3 row-start-1 flex items-center gap-1 justify-self-end sm:gap-2">
+      <SignInControl />
       <RemoteControl />
       <DiscardRemoteDialog />
       <ExportMenu canExport={canExport} onExport={handleExport} />
       <DeleteControl />
     </div>
+  );
+}
+
+function SignInControl() {
+  const { send } = AppContext.useActorRef();
+  const account = AppContext.useSelector((state) => state.context.remoteAccount);
+  const authorize = { type: 'remote.authorize', resumeSave: false } as const;
+  const canSignIn = AppContext.useSelector((state) => state.can(authorize));
+  useEffect(() => {
+    send({ type: 'remote.account' });
+  }, [send]);
+  if (account) return null;
+  return (
+    <Button
+      className="h-7 px-2"
+      size="sm"
+      variant="outline"
+      disabled={!canSignIn}
+      onClick={() => send(authorize)}
+    >
+      Sign in
+    </Button>
   );
 }
 
@@ -285,42 +308,47 @@ function HeaderBrand() {
   );
 }
 
-function CreateControl() {
-  const { send } = AppContext.useActorRef();
+function DiagramTypeControl() {
+  const selected = AppContext.useSelector(
+    (state) => state.context.translation.diagramType ?? 'flowchart',
+  );
+  const label = GRAPH_SAMPLES[selected].label;
   const canNavigate = AppContext.useSelector((state) => state.can({ type: 'workspace.create' }));
-  const handleCreate = (sample: GraphDiagramType) => {
-    logAppEvent('workspace.create');
-    send({ type: 'workspace.create', sample });
-  };
-  const items = Object.entries(GRAPH_SAMPLES).map(([key, sample]) => (
-    <DropdownMenuItem
-      key={key}
-      className="text-xs"
-      onSelect={() => handleCreate(sample.diagramType)}
-    >
-      {sample.label}
-    </DropdownMenuItem>
-  ));
   return (
     <DropdownMenu>
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
             <Button
-              aria-label={HEADER_LABELS.create}
-              className="h-7 w-7"
+              aria-label={`${HEADER_LABELS.diagramType}: ${label}`}
+              className="h-7 shrink-0 gap-1 px-2"
               disabled={!canNavigate}
-              size="icon"
+              size="sm"
               type="button"
               variant="ghost"
             >
-              <Plus aria-hidden="true" className="size-4" />
+              {label}
+              <ChevronDown aria-hidden="true" className="size-3.5" />
             </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent>{HEADER_LABELS.create}</TooltipContent>
+        <TooltipContent>{HEADER_LABELS.diagramType}</TooltipContent>
       </Tooltip>
-      <DropdownMenuContent align="start">{items}</DropdownMenuContent>
+      <DiagramTypeOptions />
     </DropdownMenu>
   );
+}
+
+function DiagramTypeOptions() {
+  const { send } = AppContext.useActorRef();
+  const openGraph = (sample: GraphDiagramType) => {
+    logAppEvent('workspace.create');
+    send({ type: 'workspace.create', sample });
+  };
+  const items = Object.values(GRAPH_SAMPLES).map(({ diagramType, label }) => (
+    <DropdownMenuItem key={diagramType} className="text-xs" onSelect={() => openGraph(diagramType)}>
+      {label}
+    </DropdownMenuItem>
+  ));
+  return <DropdownMenuContent align="start">{items}</DropdownMenuContent>;
 }

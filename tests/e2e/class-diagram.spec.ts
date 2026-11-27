@@ -374,7 +374,7 @@ async function updateSource(page: Page, value: string) {
 }
 
 async function chooseClass(page: Page) {
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('button', { name: /^Change diagram type:/ }).click();
   await page.getByRole('menuitem', { name: 'Class diagram', exact: true }).click();
   await expect(page.locator('[data-class-shape="classBox"]')).toHaveCount(2);
 }

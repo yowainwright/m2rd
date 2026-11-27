@@ -270,7 +270,7 @@ async function moveStateNode(page: Page, node: Locator) {
 }
 
 async function chooseSample(page: Page, name: string) {
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('button', { name: /^Change diagram type:/ }).click();
   await page.getByRole('menuitem', { name, exact: true }).click();
 }
 

@@ -22,6 +22,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     outputs:
       sha: ${{ steps.revision.outputs.sha }}
       bump: ${{ steps.revision.outputs.bump }}
@@ -33,8 +36,8 @@ jobs:
         run: |
           set -euo pipefail
           path="repos/$GITHUB_REPOSITORY/environments/npm"
-          gh api "$path" | jq -e '.deployment_branch_policy.custom_branch_policies == true'
-          gh api "$path/deployment-branch-policies" | jq -e \
+          gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$path" | jq -e '.deployment_branch_policy.custom_branch_policies == true'
+          gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$path/deployment-branch-policies" | jq -e \
             '.total_count == 1 and (.branch_policies[0] | .name == "main" and .type == "branch")'
 
       - name: Checkout release history
@@ -142,6 +145,7 @@ jobs:
       id-token: write
     env:
       TAG: ${{ needs.release.outputs.tag || needs.revision.outputs.tag }}
+      RELEASE_SHA: ${{ needs.release.outputs.sha || needs.revision.outputs.sha }}
       GH_TOKEN: ${{ github.token }}
     outputs:
       tag: ${{ env.TAG }}
@@ -149,8 +153,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify release commit and tag
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-parse --verify "refs/tags/${TAG}^{commit}")" = "$RELEASE_SHA"
 
       - name: Setup pnpm
         uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2

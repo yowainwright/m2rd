@@ -67,7 +67,7 @@ test('keeps navigation and sidebar reachable with a long title on mobile', async
     'A long graph title that must not hide any navigation actions on a narrow screen',
   );
   const header = page.locator('header');
-  const create = await getBounds(header.getByRole('button', { name: 'New', exact: true }));
+  const create = await getBounds(header.getByRole('button', { name: /^Change diagram type:/ }));
   const title = await getBounds(header.getByRole('button', { name: 'Rename graph', exact: true }));
   const save = await getBounds(header.getByRole('button', { name: 'Save', exact: true }));
   const download = await getBounds(header.getByRole('button', { name: 'Download', exact: true }));
@@ -1095,9 +1095,11 @@ async function expectSidebarCredits(page: Page, header: Locator, sidebar: Locato
 
 async function expectHeaderActions(page: Page, header: Locator) {
   await expectHeaderActionNames(header);
-  const actions = header.locator('button[aria-label]').filter({ has: page.locator('svg') });
-  await expect(actions).toHaveCount(4);
-  expect(await actions.allTextContents()).toEqual(['', '', '', '']);
+  const actions = header
+    .locator('button[aria-label]:not([aria-label^="Change diagram type"])')
+    .filter({ has: page.locator('svg') });
+  await expect(actions).toHaveCount(3);
+  expect(await actions.allTextContents()).toEqual(['', '', '']);
   const classes = await actions.evaluateAll((buttons) => buttons.map((button) => button.className));
   expect(
     classes.every((value) => {
@@ -1108,17 +1110,19 @@ async function expectHeaderActions(page: Page, header: Locator) {
   ).toBe(true);
   await expect(header.getByRole('heading', { name: 'm2rd', exact: true })).toBeVisible();
 
-  const create = header.getByRole('button', { name: 'New', exact: true });
+  const create = header.getByRole('button', { name: /^Change diagram type:/ });
+  await expect(create).toHaveText('Sequence');
+  await expect(create.locator('svg.lucide-chevron-down')).toBeVisible();
   const sidebarTrigger = header.getByRole('button', { name: 'Toggle Sidebar' });
   await expect(sidebarTrigger).toHaveCSS('width', '28px');
   await expect(sidebarTrigger).toHaveCSS('height', '28px');
   await expect(sidebarTrigger.locator('svg')).toHaveCSS('width', '16px');
   await expect(sidebarTrigger.locator('svg')).toHaveCSS('height', '16px');
   await create.hover();
-  await expect(page.getByRole('tooltip')).toHaveText('New');
+  await expect(page.getByRole('tooltip')).toHaveText('Change diagram type');
   await page.mouse.move(0, 0);
   await create.focus();
-  await expect(page.getByRole('tooltip')).toHaveText('New');
+  await expect(page.getByRole('tooltip')).toHaveText('Change diagram type');
   const save = header.getByRole('button', { name: 'Save', exact: true });
   await expect(save).toHaveText('save(⌃s / ⌘s)');
   await expect(save).toHaveAttribute('aria-keyshortcuts', 'Control+s Meta+s');
@@ -1137,9 +1141,10 @@ async function expectHeaderActionNames(header: Locator) {
     );
   expect(names).toEqual([
     'Toggle Sidebar',
-    'New',
+    'Change diagram type: Sequence',
     'Rename graph',
     'Save',
+    'Sign in',
     'Share',
     'Download',
     'Delete',
@@ -1147,7 +1152,7 @@ async function expectHeaderActionNames(header: Locator) {
 }
 
 async function createNewGraph(page: Page) {
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('button', { name: /^Change diagram type:/ }).click();
   await page.getByRole('menuitem', { name: 'Sequence', exact: true }).click();
 }
 

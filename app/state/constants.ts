@@ -101,7 +101,7 @@ const ACTIVE_DOCUMENT = appSetup.createStateConfig({
     },
     'workspace.delete': { guard: 'canDelete', target: '#workspace-deleting' },
     'workspace.save': { guard: 'canSave', target: '.saving' },
-    'remote.authorize': { target: '#workspace-signing-in' },
+    'remote.authorize': { guard: 'canNavigate', target: '#workspace-signing-in' },
   },
   states: {
     ready: {},
@@ -130,6 +130,7 @@ const ACTIVE_DOCUMENT = appSetup.createStateConfig({
         'workspace.load': {},
         'workspace.delete': {},
         'workspace.save': {},
+        'remote.authorize': {},
         'layout.reset': {},
       },
       invoke: {
@@ -205,7 +206,10 @@ const DOCUMENT = appSetup.createStateConfig({
       tags: ['storageBusy'],
       invoke: {
         src: 'authorizeRemote',
-        input: getActorInput,
+        input: ({ context, event }) => {
+          const resumeSave = event.type === 'remote.authorize' && event.resumeSave;
+          return { context, resumeSave };
+        },
         onError: {
           target: 'active.recover',
           actions: { type: 'reportOperationError', params: getActorError },
@@ -351,6 +355,7 @@ const REMOTE = appSetup.createStateConfig({
     listing: {
       invoke: {
         src: 'listRemote',
+        input: getActorInput,
         onDone: {
           target: 'idle',
           actions: { type: 'acceptAccountSnapshots', params: getActorOutput },

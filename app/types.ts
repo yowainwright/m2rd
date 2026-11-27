@@ -33,6 +33,12 @@ export type SharedSnapshot = RemoteSnapshot & { forkedFrom?: SnapshotProvenance;
 export type AccountSnapshot = Pick<RemoteSnapshot, 'gistId' | 'revision' | 'url'> & {
   title: string;
 };
+export type AccountSnapshotPage = {
+  accountId: string | null;
+  snapshots: AccountSnapshot[];
+  page: number;
+  nextPage: number | null;
+};
 export type AppContext = {
   isDesktop: boolean | null;
   mermaidPanelCollapsed: boolean;
@@ -58,6 +64,7 @@ export type AppContext = {
   remoteAccount: string | null;
   remoteError: string | null;
   accountSnapshots: AccountSnapshot[];
+  nextSnapshotPage: number | null;
   input: GraphInput;
   translation: GraphTranslation;
   workspace: GraphWorkspace;
@@ -70,7 +77,7 @@ export type AppEvent =
   | { type: 'remote.account' }
   | { type: 'remote.save' }
   | { type: 'remote.resume' }
-  | { type: 'remote.authorize' }
+  | { type: 'remote.authorize'; resumeSave: boolean }
   | { type: 'remote.discard' }
   | { type: 'remote.discard.confirm' }
   | { type: 'remote.discard.cancel' }

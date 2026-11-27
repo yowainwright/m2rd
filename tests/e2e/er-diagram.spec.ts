@@ -144,7 +144,7 @@ async function updateSource(page: Page, source: string) {
 }
 
 async function chooseEr(page: Page) {
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('button', { name: /^Change diagram type:/ }).click();
   await page.getByRole('menuitem', { name: 'ER diagram', exact: true }).click();
   await expect(page.locator('[data-er-entity]')).toHaveCount(3);
 }

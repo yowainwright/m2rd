@@ -27,6 +27,10 @@ import { WorkspaceHeader } from '@/app/components/workspace/header';
 import { WorkspaceSidebar } from '@/app/components/workspace/sidebar';
 import { GANTT_SOURCE } from '@/app/constants';
 
+vi.mock('better-auth/client', () => ({
+  createAuthClient: () => ({ getSession: () => Promise.resolve({ data: null }) }),
+}));
+
 const settings = {
   edgeAnimation: 'none',
   edgeColor: '#171717',

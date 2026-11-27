@@ -80,3 +80,25 @@ test('rejects a superseded release retry instead of rolling the site back', () =
     output: '',
   });
 });
+
+test('pins publication to the release commit on the first run and on retries', () => {
+  const publish = workflow.split('\n  publish:\n')[1].split('\n  npm:\n')[0];
+  expect(publish).toContain(
+    'RELEASE_SHA: ${{ needs.release.outputs.sha || needs.revision.outputs.sha }}',
+  );
+  expect(publish).toContain('ref: ${{ env.RELEASE_SHA }}');
+  const verify = publish.match(
+    /- name: Verify release commit and tag\n +run: \|\n((?:          .+\n)+)/,
+  );
+  if (!verify) throw new Error('Release tag verification is missing.');
+  const beforeSetup = publish.split('- name: Setup pnpm')[0];
+  expect(beforeSetup).toContain(verify[0]);
+  const git =
+    'git() { case "$*" in "rev-parse HEAD") echo commit ;; "rev-parse --verify refs/tags/v1^{commit}") echo "$TAG_SHA" ;; *) return 1 ;; esac; }';
+  const verifyTag = (tagSha: string) =>
+    spawnSync('bash', ['-ec', git + '\n' + verify[1]], {
+      env: { NODE_ENV: 'test', TAG: 'v1', RELEASE_SHA: 'commit', TAG_SHA: tagSha },
+    }).status;
+  expect(verifyTag('commit')).toBe(0);
+  expect(verifyTag('different')).toBe(1);
+});
