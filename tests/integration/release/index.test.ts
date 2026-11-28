@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../..');
 const cache = resolve(root, '.next/cache');
-const workflow = readFileSync(resolve(root, '.github/workflows/gh-pages.yml'), 'utf8');
+const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8');
 const block = workflow.match(
   /      - name: Resolve release revision[\s\S]*?        run: \|\n((?:          .*\n)+)/,
 );
@@ -21,13 +21,13 @@ git() {
   esac
 }`;
 
-const resolveRevision = (event: string, released = '', head = 'checked-main') => {
+const resolveRevision = (released = '', head = 'requested-main', increment = 'patch') => {
   mkdirSync(cache, { recursive: true });
   const directory = mkdtempSync(resolve(cache, 'release-test-'));
   const outputFile = resolve(directory, 'output');
   const env = Object.assign({}, process.env, {
-    EVENT_NAME: event,
-    SOURCE_SHA: 'merge-sha',
+    SOURCE_SHA: 'requested-main',
+    INCREMENT: increment,
     GITHUB_OUTPUT: outputFile,
     MOCK_RELEASE: released,
     MOCK_HEAD: head,
@@ -46,30 +46,59 @@ const resolveRevision = (event: string, released = '', head = 'checked-main') =>
   }
 };
 
-test('queues a patch for a new main push using the revision that checks will validate', () => {
-  expect(resolveRevision('push')).toEqual({
-    status: 0,
-    output: 'sha=checked-main\nbump=true\n',
-  });
+test.each(['patch', 'minor', 'major'])(
+  'queues a %s for the selected main revision',
+  (increment) => {
+    expect(resolveRevision('', 'requested-main', increment)).toEqual({
+      status: 0,
+      output: 'sha=requested-main\nbump=true\n',
+    });
+  },
+);
+
+test('rejects unsupported version increments', () => {
+  expect(resolveRevision('', 'requested-main', 'premajor')).toEqual({ status: 1, output: '' });
 });
 
 test('reuses the recorded release on a retry without bumping again', () => {
-  expect(resolveRevision('push', 'release-sha', 'release-sha')).toEqual({
+  expect(resolveRevision('release-sha', 'release-sha')).toEqual({
     status: 0,
     output: 'sha=release-sha\nbump=false\ntag=v0.0.18\n',
   });
 });
 
-test('manual dispatch preserves the selected revision and version', () => {
-  expect(resolveRevision('workflow_dispatch')).toEqual({
-    status: 0,
-    output: 'sha=merge-sha\nbump=false\n',
+test('rejects a dispatch after main advances', () => {
+  expect(resolveRevision('', 'new-main')).toEqual({
+    status: 1,
+    output: '',
   });
 });
 
 test('rejects a superseded release retry instead of rolling the site back', () => {
-  expect(resolveRevision('push', 'old-release', 'new-main')).toEqual({
+  expect(resolveRevision('old-release', 'new-main')).toEqual({
     status: 1,
     output: '',
   });
+});
+
+test('pins publication to the release commit on the first run and on retries', () => {
+  const publish = workflow.split('\n  publish:\n')[1].split('\n  npm:\n')[0];
+  expect(publish).toContain(
+    'RELEASE_SHA: ${{ needs.release.outputs.sha || needs.revision.outputs.sha }}',
+  );
+  expect(publish).toContain('ref: ${{ env.RELEASE_SHA }}');
+  const verify = publish.match(
+    /- name: Verify release commit and tag\n +run: \|\n((?:          .+\n)+)/,
+  );
+  if (!verify) throw new Error('Release tag verification is missing.');
+  const beforeSetup = publish.split('- name: Setup pnpm')[0];
+  expect(beforeSetup).toContain(verify[0]);
+  const git =
+    'git() { case "$*" in "rev-parse HEAD") echo commit ;; "rev-parse --verify refs/tags/v1^{commit}") echo "$TAG_SHA" ;; *) return 1 ;; esac; }';
+  const verifyTag = (tagSha: string) =>
+    spawnSync('bash', ['-ec', git + '\n' + verify[1]], {
+      env: { NODE_ENV: 'test', TAG: 'v1', RELEASE_SHA: 'commit', TAG_SHA: tagSha },
+    }).status;
+  expect(verifyTag('commit')).toBe(0);
+  expect(verifyTag('different')).toBe(1);
 });

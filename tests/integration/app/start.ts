@@ -5,6 +5,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import Home from '@/app/page';
 
+vi.mock('better-auth/client', () => ({
+  createAuthClient: () => ({ getSession: () => Promise.resolve({ data: null }) }),
+}));
+
 vi.mock('next/dynamic', () => ({
   default: () => {
     return function DynamicEditor() {

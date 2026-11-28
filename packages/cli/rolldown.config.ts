@@ -16,12 +16,12 @@ const CLI_EXTERNALS = [
 ];
 
 export default defineConfig({
-  input: 'app/lib/cli/index.ts',
+  input: 'src/index.ts',
   platform: 'node',
   transform: { target: 'node22.22.2' },
   external: CLI_EXTERNALS,
   output: {
-    dir: 'tmp/cli',
+    dir: 'dist',
     format: 'esm',
     entryFileNames: 'm2rd-cli.mjs',
     chunkFileNames: '[name]-[hash].mjs',

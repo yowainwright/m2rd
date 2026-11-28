@@ -110,7 +110,8 @@ function writeManifest(directory: string) {
 
 function packageManifest() {
   const project = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-  const { name, version, description, author, license, repository } = project;
+  const { name } = require('./package.json');
+  const { version, description, author, license, repository } = project;
   return {
     name,
     version,
@@ -118,7 +119,6 @@ function packageManifest() {
     author,
     license,
     repository,
-    private: true,
     type: 'module',
     bin: { m2rd: 'm2rd-cli.mjs' },
     files: ['*.mjs', '*.ttf', '*.txt'],

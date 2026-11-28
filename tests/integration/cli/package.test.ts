@@ -26,7 +26,7 @@ const installation = resolve(directory, 'install');
 
 const project = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 
-const installed = resolve(installation, 'node_modules', project.name);
+const installed = resolve(installation, 'node_modules', 'm2rd');
 
 const cli = resolve(installation, 'node_modules/.bin/m2rd');
 
@@ -47,7 +47,7 @@ const env: NodeJS.ProcessEnv = {
 let artifact: { path: string; bytes: number; unpackedBytes: number };
 
 beforeAll(() => {
-  const script = resolve(root, 'scripts/cli/index.ts');
+  const script = resolve(root, 'packages/cli/pack.ts');
   const result = execFileSync(process.execPath, [script], {
     cwd: root,
     encoding: 'utf8',
@@ -61,8 +61,9 @@ afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
 test('installs an npm command without runtime dependencies or lifecycle scripts', () => {
   const manifest = JSON.parse(readFileSync(resolve(installed, 'package.json'), 'utf8'));
-  expect(manifest.name).toBe(project.name);
+  expect(manifest.name).toBe('m2rd');
   expect(manifest.version).toBe(project.version);
+  expect(manifest.private).not.toBe(true);
   expect(manifest.dependencies ?? {}).toEqual({});
   expect(manifest.optionalDependencies ?? {}).toEqual({});
   expect(manifest.peerDependencies ?? {}).toEqual({});
@@ -109,7 +110,7 @@ test('removes the build directory while preserving the tarball', () => {
 });
 
 test('removes the build directory when npm pack fails', () => {
-  const script = resolve(root, 'scripts/cli/index.ts');
+  const script = resolve(root, 'packages/cli/pack.ts');
   const failureEnv = { ...process.env, PATH: directory };
   const archive = readFileSync(artifact.path);
   const result = spawnSync(process.execPath, [script], {

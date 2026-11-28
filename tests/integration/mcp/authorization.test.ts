@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
+import project from '@/package.json' with { type: 'json' };
 import {
   githubFixtureFetch,
   issueFixtureToken,
@@ -29,6 +30,7 @@ it('discovers exactly two tools, calls them, and revokes the same grant at sign-
   const tokens = await issueFixtureToken(fixture, cookie);
   const client = await connectClient(tokens.access_token);
   try {
+    expect(client.getServerVersion()).toMatchObject({ name: 'm2rd-mcp', version: project.version });
     await expectTools(client);
     await signOut(cookie);
     await expect(connectClient(tokens.access_token)).rejects.toThrow();

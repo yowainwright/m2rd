@@ -156,6 +156,7 @@ export const APP_INITIAL_CONTEXT: AppContext = {
   remoteAccount: null,
   remoteError: null,
   accountSnapshots: [],
+  nextSnapshotPage: null,
   workspaces: [],
   versions: [],
   workspace: {

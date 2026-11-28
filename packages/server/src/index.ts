@@ -1,27 +1,33 @@
 import { Effect } from 'effect';
+import { isIP } from 'node:net';
 import { Readable } from 'node:stream';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import cors from '@koa/cors';
 import { toWebRequest } from '@modelcontextprotocol/node';
 import Koa from 'koa';
 import { z } from 'zod';
-import {
-  assertLiveAccount,
-  cleanupAuth,
-  createAuth,
-  getGitHubAccess,
-  handleAuth,
-  protectMcp,
-  verifyBrowserAccount,
-} from './auth';
+import { cleanupAuth, createAuth, handleAuth, protectMcp, verifyBrowserAccount } from './auth';
 import type { ServerAuthOptions, VerifiedAccount } from './auth/types';
-import { AdmissionError, createAccountAdmission, openDatabase } from './auth/utils';
+import {
+  AdmissionError,
+  assertLiveAccount,
+  createAccountAdmission,
+  openDatabase,
+} from './auth/utils';
 import { createMcp } from './mcp';
-import { discoverSnapshots, GistError, prepareSave, readSnapshot, saveSnapshot } from './github';
+import {
+  createPublicSnapshotReader,
+  discoverSnapshots,
+  GistError,
+  prepareSave,
+  saveSnapshot,
+} from './auth/clients/github';
+import { getGitHubAccess } from './auth/clients/github/utils';
 
 type McpRequest = (request: Request, account: VerifiedAccount) => Promise<Response>;
 
 type RequestServices = {
+  readPublic: ReturnType<typeof createPublicSnapshotReader>;
   auth: ReturnType<typeof createAuth>;
   admit: ReturnType<typeof createAccountAdmission>;
 };
@@ -33,6 +39,7 @@ const discoveryPrefix = '/.well-known/';
 const authPath = '/api/auth';
 const snapshotsPath = '/api/snapshots';
 const frozenPath = /^\/api\/snapshots\/([a-f0-9]+)\/([a-f0-9]{40})$/i;
+const pageNumber = z.coerce.number().int().min(1).max(2_147_483_647);
 const saveSchema = z.strictObject({
   snapshot: z.string(),
   reconcileOnly: z.boolean().optional(),
@@ -47,7 +54,14 @@ const saveSchema = z.strictObject({
     .regex(/^[a-f0-9]+$/i)
     .optional(),
 });
-const protocols = ['MCP-Protocol-Version', 'MCP-Session-Id', 'WWW-Authenticate', 'DPoP-Nonce'];
+const protocols = [
+  'MCP-Protocol-Version',
+  'MCP-Session-Id',
+  'WWW-Authenticate',
+  'DPoP-Nonce',
+  'Link',
+  'M2rd-Account-Id',
+];
 const envSchema = z.object({
   M2RD_API_ORIGIN: z.url().default('https://m2rd-api.jeffry.in'),
   M2RD_FRONTEND_ORIGIN: z.url().default('https://jeffry.in'),
@@ -55,9 +69,10 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
-  MCP_VERIFIER_CLIENT_ID: z.string().min(1),
-  MCP_VERIFIER_CLIENT_SECRET: z.string().min(1),
+  MCP_VERIFIER_CLIENT_ID: z.string().min(1).optional(),
+  MCP_VERIFIER_CLIENT_SECRET: z.string().min(1).optional(),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  M2RD_TRUST_SNAPSHOT_PROXY: z.enum(['true', 'false']).default('false'),
 });
 
 export const createServer = (options: ServerAuthOptions, mcp?: McpRequest) => {
@@ -66,7 +81,7 @@ export const createServer = (options: ServerAuthOptions, mcp?: McpRequest) => {
   const admit = createAccountAdmission(options.database);
   const mcpHandler = mcp ?? createMcp(auth, admit);
   const protectedMcp = protectMcp(options, mcpHandler);
-  const services = { auth, admit };
+  const services = { auth, admit, readPublic: createPublicSnapshotReader() };
   const expectedHost = new URL(options.apiOrigin).host;
   app.silent = true;
   app.use(handleErrors);
@@ -97,6 +112,7 @@ const startServer = () => {
     githubClientSecret: env.GITHUB_CLIENT_SECRET,
     verifierClientId: env.MCP_VERIFIER_CLIENT_ID,
     verifierClientSecret: env.MCP_VERIFIER_CLIENT_SECRET,
+    trustSnapshotProxy: env.M2RD_TRUST_SNAPSHOT_PROXY === 'true',
   };
   const { app, auth } = createServer(options);
   const cleanup = setInterval(() => {
@@ -117,12 +133,13 @@ const dispatchRequest = async (
   context: Koa.Context,
   options: ServerAuthOptions,
   services: RequestServices,
-  protectedMcp: (request: Request) => Promise<Response>,
+  protectedMcp: ReturnType<typeof protectMcp>,
 ) => {
   if (context.path === '/mcp') return dispatchMcp(context, options.apiOrigin, protectedMcp);
   if (context.path.startsWith(snapshotsPath)) {
     const request = await getWebRequest(context, options.apiOrigin, maximumSaveRequestBytes);
-    return dispatchSnapshots(request, options.frontendOrigin, services);
+    const peer = snapshotPeer(context, options.trustSnapshotProxy);
+    return dispatchSnapshots(request, options.frontendOrigin, services, peer);
   }
   const isAuth =
     context.path.startsWith(authPath + '/') || context.path.startsWith(discoveryPrefix);
@@ -133,19 +150,67 @@ const dispatchRequest = async (
   return new Response(null, { status: 404 });
 };
 
-const dispatchSnapshots = async (request: Request, origin: string, services: RequestServices) => {
+const snapshotPeer = (context: Koa.Context, trustProxy = false) => {
+  const peer = context.req.socket.remoteAddress ?? 'unknown';
+  const trusted = trustProxy && peer === '127.0.0.1';
+  if (!trusted) return peer;
+  const forwarded = context.get('X-Forwarded-For').split(',').at(-1)?.trim();
+  const valid = forwarded && isIP(forwarded);
+  return valid ? forwarded : peer;
+};
+
+const dispatchSnapshots = async (
+  request: Request,
+  origin: string,
+  services: RequestServices,
+  peer: string,
+) => {
   const path = new URL(request.url).pathname;
   const frozen = frozenPath.exec(path);
   const readsRevision = frozen && request.method === 'GET';
   if (readsRevision) {
     const [, gistId, revision] = frozen;
-    const loaded = await readSnapshot({ gistId, revision }, request.signal);
+    const loaded = await services.readPublic(gistId, revision, peer, request.signal);
     return Response.json(loaded);
   }
   if (path !== snapshotsPath) return new Response(null, { status: 404 });
   const account = await verifyBrowserAccount(services.auth, request.headers);
   if (!account) return new Response(null, { status: 401 });
+  if (request.method === 'GET') return listAccountSnapshots(request, services, account);
   return dispatchAccountSnapshot(request, origin, services, account);
+};
+
+const listAccountSnapshots = async (
+  request: Request,
+  { auth, admit }: RequestServices,
+  account: VerifiedAccount,
+) => {
+  const query = new URL(request.url).searchParams;
+  const requested = pageNumber.safeParse(query.get('page') ?? 1);
+  if (!requested.success) return new Response(null, { status: 400 });
+  const owner = query.get('account');
+  const switched = owner !== null && owner !== account.id;
+  const page = switched ? 1 : requested.data;
+  const result = await Effect.runPromise(
+    admit(account.id, (charge) =>
+      Effect.tryPromise({
+        try: async () => {
+          const access = await getGitHubAccess(auth, account);
+          return discoverSnapshots(access, request.signal, page, charge);
+        },
+        catch: (cause) => (cause instanceof Error ? cause : new Error('Snapshot listing failed.')),
+      }),
+    ),
+  );
+  const headers = new Headers({
+    'M2rd-Account-Id': account.id,
+    'Cache-Control': 'private, no-store',
+  });
+  if (result.hasNext) {
+    const next = new URLSearchParams({ page: String(page + 1), account: account.id });
+    headers.set('Link', `<${snapshotsPath}?${next}>; rel="next"`);
+  }
+  return Response.json(result.snapshots, { headers });
 };
 
 const dispatchAccountSnapshot = async (
@@ -154,10 +219,6 @@ const dispatchAccountSnapshot = async (
   { auth, admit }: RequestServices,
   account: VerifiedAccount,
 ) => {
-  if (request.method === 'GET') {
-    const access = await getGitHubAccess(auth, account);
-    return Response.json(await discoverSnapshots(access, request.signal));
-  }
   if (request.method !== 'POST') return new Response(null, { status: 405 });
   if (request.headers.get('origin') !== origin) return new Response(null, { status: 403 });
   const input = saveSchema.safeParse(await request.json());
@@ -166,11 +227,11 @@ const dispatchAccountSnapshot = async (
     admit(account.id, (charge) =>
       Effect.tryPromise({
         try: async () => {
+          charge();
           const access = await getGitHubAccess(auth, account);
           const prepared = await prepareSave(input.data, access, request.signal);
           if (prepared.existing) return prepared.existing;
           await assertLiveAccount(auth, account);
-          charge();
           return saveSnapshot(prepared, access, request.signal);
         },
         catch: (cause) =>
@@ -184,8 +245,9 @@ const dispatchAccountSnapshot = async (
 const dispatchMcp = async (
   context: Koa.Context,
   origin: string,
-  handler: (request: Request) => Promise<Response>,
+  handler: ReturnType<typeof protectMcp>,
 ) => {
+  if (!handler) return new Response(null, { status: 503 });
   if (context.method !== 'POST') {
     return new Response(null, { status: 405, headers: { Allow: 'POST' } });
   }

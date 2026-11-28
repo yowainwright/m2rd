@@ -1,9 +1,9 @@
 # m2rd
 
-<!-- Workflow badges from .github/workflows/test.yml and .github/workflows/gh-pages.yml -->
+<!-- Workflow badges from .github/workflows/test.yml and .github/workflows/release.yml -->
 
 [![PR checks](https://github.com/yowainwright/m2rd/actions/workflows/test.yml/badge.svg?event=pull_request)](https://github.com/yowainwright/m2rd/actions/workflows/test.yml)
-[![Deploy GitHub Pages](https://github.com/yowainwright/m2rd/actions/workflows/gh-pages.yml/badge.svg?branch=main)](https://github.com/yowainwright/m2rd/actions/workflows/gh-pages.yml)
+[![Release m2rd](https://github.com/yowainwright/m2rd/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/yowainwright/m2rd/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 m2rd, mermaid to react diagram, is built render mermaid within terminal and web app.
@@ -52,11 +52,30 @@ That's it!
 
 ---
 
+## Release the CLI
+
+Choose one command to release from `main`.
+
+- `pnpm run release:patch` for a bug fix
+- `pnpm run release:minor` for a backward-compatible feature
+- `pnpm run release:major` for a breaking change
+
+From a clean `main` checkout, `pnpm run release:dry` previews a patch. GitHub Actions tests the selected revision, tags the requested version, and publishes the same attested `m2rd` tarball to GitHub Releases and npm. It opens a formula PR in `yowainwright/homebrew-tap` and deploys the website. Merge the tap PR to make the version available through Homebrew.
+
+For initial setup, create the GitHub environment `npm` with a single deployment rule allowing the branch `main`. The npm package owner must control the public name `m2rd`. For a new package, npm supports reserving the name by staging a first tarball. [npm first-publish instructions](https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages/)
+
+```sh
+npm trust github m2rd --repo yowainwright/m2rd --file release.yml --env npm --allow-publish
+npm trust list m2rd
+```
+
+In npm package settings, select **Require two-factor authentication and disallow tokens**. The publish job uses GitHub OIDC. The tap PR uses the separate `HOMEBREW_TAP_TOKEN` with contents and pull-request write access to the tap. [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
+
 ## Share a graph
 
 In the editor, open **Share** and choose **Save to GitHub**. Sign in with GitHub to save the Mermaid source, edited React Flow graph, and one SVG frame to an unlisted Gist. Anyone with its link can view and edit a local copy. Copy the saved link from the Share menu.
 
-Each save adds a file to your Gist. Earlier links open the exact revision they originally referenced. Saving edits to someone else's diagram creates a fork in your account with a link back to the original snapshot. If GitHub cannot confirm a save, reopen Share and retry the pending save. Deleting a Gist or revision makes its links unavailable.
+Each save adds a file to your Gist. Earlier links open the exact revision they originally referenced. Saving edits to someone else's unlisted Gist creates a fork in your account with a link back to the original snapshot. Saving edits from a public Gist creates a new unlisted Gist in your account. If GitHub cannot confirm a save, reopen Share and retry the pending save. After you delete a Gist or revision, anyone with its link can still open a cached copy for up to five minutes.
 
 <!-- Pending-save recovery from app/components/workspace/header/index.tsx and app/state/constants.ts -->
 
@@ -73,7 +92,9 @@ Connect a client that supports MCP 2026-07-28 to `https://m2rd-api.jeffry.in/mcp
 | `render_text`  | `source`, optional `ascii` and `width` | CLI text for flowchart, sequence, and state diagrams                              |
 | `create_graph` | `source`, optional `title`             | Frozen link and SVG for flowchart, sequence, state, class, ER, and Gantt diagrams |
 
-Text width ranges from 16 to 500 columns and defaults to 80. An account can start 10 operations per clock minute and 100 per UTC day, shared across MCP and GitHub saves. A graph creation and its save count as one operation. Mermaid input is limited to 32 KiB, serialized snapshots to 1 MiB, and SVG to 512 KiB. A render has a 10-second deadline.
+Text width ranges from 16 to 500 columns and defaults to 80. An account can start 10 operations per clock minute and 100 per UTC day, shared across MCP tools, GitHub saves, and snapshot listing pages. A graph creation and its save count as one operation. Mermaid input is limited to 32 KiB, serialized snapshots to 1 MiB, and SVG to 512 KiB. A render has a 10-second deadline.
+
+Each browser save attempt, including a retry, counts toward the account limit. Save preparation stops after 32 GitHub reads if it still cannot determine the destination or confirm an earlier save.
 
 The SVG is included as an embedded resource. Whether it appears inline depends on the MCP client. Access tokens last 15 minutes and can renew for up to seven days after sign-in. Signing out revokes access across the account's clients. Inactive GitHub credentials expire after seven days. Saved Gists stay in the owner's account.
 
@@ -93,6 +114,8 @@ pnpm run server:start
 ```
 
 The API listens on loopback port 3000 by default. `PORT`, `M2RD_API_ORIGIN`, and `M2RD_FRONTEND_ORIGIN` configure the listener and public URLs. Set `NEXT_PUBLIC_M2RD_API_ORIGIN` at frontend build time for a different API. Keep the public authorization and callback URLs reachable through the exe.dev proxy. Use SQLite's backup API and verify restore in a separate database before rollout. [exe.dev proxy](https://exe.dev/docs/proxy) · [SQLite backup API](https://www.sqlite.org/backup.html)
+
+Public snapshot reads share a five-minute cache. Each server process allows 48 uncached reads per rolling hour, up to 12 per client IP. By default the server uses the socket peer. Set `M2RD_TRUST_SNAPSHOT_PROXY=true` only when a trusted proxy connects over IPv4 loopback and appends the verified client IP as the last `X-Forwarded-For` entry. [exe.dev proxy headers](https://exe.dev/docs/proxy) · [GitHub API rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
 
 In Cloudflare, create a URL Rewrite Rule that matches `http.host eq "jeffry.in"` and `http.request.uri.path matches "^/m2rd/[0-9a-fA-F]+-[0-9a-fA-F]{40}$"`. Set the rewritten path to the static value `/m2rd/` and preserve the query string. Check the zone's plan support and rule ordering before enabling it. [Cloudflare URL Rewrite Rules](https://developers.cloudflare.com/rules/transform/url-rewrite/)
 

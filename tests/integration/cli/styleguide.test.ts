@@ -5,14 +5,17 @@ import { JSDOM } from 'jsdom';
 import stringWidth from 'string-width';
 import { createActor, waitFor } from 'xstate';
 import { afterAll, afterEach, expect, test, vi } from 'vitest';
-import { runStyleguide } from '@/app/lib/cli/styleguide';
-import { STYLEGUIDE_EXPORT_PATH, STYLEGUIDE_VIEWPORT } from '@/app/lib/cli/styleguide/constants';
-import { svgStyleguideSource } from '@/app/lib/cli/styleguide/utils';
-import { svgTheme } from '@/app/lib/cli/themes/mermaid/constants';
-import { showViewer } from '@/app/lib/cli/viewer';
-import { VIEWER_MACHINE } from '@/app/lib/cli/viewer/constants';
+import { runStyleguide } from '@/packages/cli/src/styleguide';
+import {
+  STYLEGUIDE_EXPORT_PATH,
+  STYLEGUIDE_VIEWPORT,
+} from '@/packages/cli/src/styleguide/constants';
+import { svgStyleguideSource } from '@/packages/cli/src/styleguide/utils';
+import { svgTheme } from '@/packages/cli/src/themes/mermaid/constants';
+import { showViewer } from '@/packages/cli/src/viewer';
+import { VIEWER_MACHINE } from '@/packages/cli/src/viewer/constants';
 
-vi.mock('@/app/lib/cli/viewer', () => ({ showViewer: vi.fn() }));
+vi.mock('@/packages/cli/src/viewer', () => ({ showViewer: vi.fn() }));
 
 const root = resolve(import.meta.dirname, '../../../tmp');
 mkdirSync(root, { recursive: true });

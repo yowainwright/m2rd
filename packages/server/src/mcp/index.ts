@@ -3,13 +3,16 @@ import { createMcpHandler, McpServer, type CallToolResult } from '@modelcontextp
 import { Effect, Option, Schema } from 'effect';
 import { JSDOM } from 'jsdom';
 import { z } from 'zod';
+import project from '@/package.json' with { type: 'json' };
+import serverPackage from '../../package.json' with { type: 'json' };
 import { DEFAULT_SETTINGS, GRAPH_DIAGRAM_TYPES } from '@/app/graph/constants';
 import { encodeSnapshot } from '@/app/graph/snapshot';
 import { SnapshotElementsSchema } from '@/app/graph/snapshot/constants';
-import { assertLiveAccount, getGitHubAccess, type createAuth } from '../auth';
-import { createAccountAdmission } from '../auth/utils';
+import type { createAuth } from '../auth';
+import { assertLiveAccount, createAccountAdmission } from '../auth/utils';
 import type { VerifiedAccount } from '../auth/types';
-import { prepareSave, saveSnapshot } from '../github';
+import { prepareSave, saveSnapshot } from '../auth/clients/github';
+import { getGitHubAccess } from '../auth/clients/github/utils';
 import { graphInput, textInput, type RenderJob } from './types';
 import { runRender } from './utils';
 
@@ -27,6 +30,7 @@ const graphOutput = z.strictObject({
   fileName: z.string(),
 });
 const mcpOptions = { legacy: 'reject' } as const;
+const serverInfo = { name: serverPackage.name, version: project.version };
 
 export const createMcp = (
   auth: ReturnType<typeof createAuth>,
@@ -34,7 +38,7 @@ export const createMcp = (
 ) => {
   return (request: Request, account: VerifiedAccount) => {
     const handler = createMcpHandler(() => {
-      const server = new McpServer({ name: 'm2rd', version: '0.0.18' });
+      const server = new McpServer(serverInfo);
       server.registerTool(
         'render_text',
         {

@@ -1,50 +1,166 @@
-name: Release
+name: Release m2rd
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
-      tag:
-        description: Exact tag to publish after validation
-        type: string
+      increment:
+        description: Version increment
+        type: choice
         required: true
-      checks-passed:
-        description: Caller has already completed the reusable test workflow
-        type: boolean
-        default: false
-    secrets:
-      HOMEBREW_TAP_TOKEN:
-        required: false
-  push:
-    tags: ['v*']
+        default: patch
+        options: [patch, minor, major]
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-m2rd
+  cancel-in-progress: false
+
 jobs:
-  test:
-    if: ${{ !inputs.checks-passed }}
+  revision:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+      bump: ${{ steps.revision.outputs.bump }}
+      tag: ${{ steps.revision.outputs.tag }}
+    steps:
+      - name: Verify npm deployment is restricted to main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          path="repos/$GITHUB_REPOSITORY/environments/npm"
+          gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$path" | jq -e '.deployment_branch_policy.custom_branch_policies == true'
+          gh api -H 'X-GitHub-Api-Version: 2026-03-10' "$path/deployment-branch-policies" | jq -e \
+            '.total_count == 1 and (.branch_policies[0] | .name == "main" and .type == "branch")'
+
+      - name: Checkout release history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve release revision
+        id: revision
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          INCREMENT: ${{ inputs.increment }}
+        run: |
+          set -euo pipefail
+          case "$INCREMENT" in patch|minor|major) ;; *) exit 1 ;; esac
+          released_sha=$(git log --first-parent --format=%H -1 --all-match \
+            --grep="^Release-Source: $SOURCE_SHA$" --grep="^Release-Increment: $INCREMENT$" origin/main)
+          if [ -n "$released_sha" ]; then
+            if [ "$released_sha" != "$(git rev-parse HEAD)" ]; then
+              echo '::error::This release was superseded by a newer main.'
+              exit 1
+            fi
+            tag=$(git show "$released_sha:package.json" | node -p '"v" + JSON.parse(require("node:fs").readFileSync(0, "utf8")).version')
+            printf 'sha=%s\nbump=false\ntag=%s\n' "$released_sha" "$tag" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          printf 'sha=%s\nbump=true\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+  checks:
+    needs: revision
     uses: ./.github/workflows/test.yml
     with:
-      ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      ref: ${{ needs.revision.outputs.sha }}
+      pages-artifact: true
+      increment: ${{ needs.revision.outputs.bump == 'true' && inputs.increment || '' }}
 
   release:
-    needs: test
+    needs: [revision, checks]
+    if: needs.revision.outputs.bump == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify checked revision
+        env:
+          CHECKED_SHA: ${{ needs.revision.outputs.sha }}
+        run: test "$(git rev-parse HEAD)" = "$CHECKED_SHA"
+
+      - name: Setup pnpm
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 12.2.1
+          cache: true
+          install: false
+          runtime: node@26
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify install preserves tracked files
+        run: |
+          git status --short
+          git diff --exit-code
+
+      - name: Create release
+        id: release
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          INCREMENT: ${{ inputs.increment }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          release_message=$(printf "chore(release): \${version}\n\nRelease-Source: %s\nRelease-Increment: %s" "$SOURCE_SHA" "$INCREMENT")
+          pnpm exec release-it "$INCREMENT" --ci --no-hooks --git.push \
+            --git.commitMessage="$release_message" \
+            --git.pushArgs=--follow-tags --git.pushArgs=--atomic
+          tag="v$(node -p 'require("./package.json").version')"
+          printf 'sha=%s\ntag=%s\n' "$(git rev-parse HEAD)" "$tag" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: [revision, checks, release]
     if: >-
-      ${{ !cancelled() && (needs.test.result == 'success' ||
-          (inputs.checks-passed && needs.test.result == 'skipped')) }}
+      ${{ !cancelled() && needs.checks.result == 'success' &&
+          (needs.release.outputs.tag != '' || needs.revision.outputs.tag != '') &&
+          (needs.release.result == 'success' || needs.release.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
+      attestations: write
+      id-token: write
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      TAG: ${{ needs.release.outputs.tag || needs.revision.outputs.tag }}
+      RELEASE_SHA: ${{ needs.release.outputs.sha || needs.revision.outputs.sha }}
       GH_TOKEN: ${{ github.token }}
+    outputs:
+      tag: ${{ env.TAG }}
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify release commit and tag
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-parse --verify "refs/tags/${TAG}^{commit}")" = "$RELEASE_SHA"
 
       - name: Setup pnpm
         uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
@@ -58,15 +174,22 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Verify tag matches package version
-        run: test "${TAG#v}" = "$(node -p 'require("./package.json").version')"
+        run: |
+          test "${TAG#v}" = "$(node -p 'require("./package.json").version')"
+          echo "ASSET=m2rd-${TAG#v}.tgz" >> "$GITHUB_ENV"
 
       - name: Pack CLI tarball
         run: pnpm run cli:pack
 
+      - name: Attest CLI tarball
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: tmp/${{ env.ASSET }}
+          create-storage-record: false
+
       - name: Create GitHub release
         run: |
           set -euo pipefail
-          ASSET="m2rd-${TAG#v}.tgz"
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release view "$TAG" --json assets |
               jq -e --arg name "$ASSET" '.assets | any(.name == $name)'
@@ -74,13 +197,53 @@ jobs:
           fi
           gh release create "$TAG" "tmp/$ASSET" --title "$TAG" --generate-notes --verify-tag
 
-  tap:
-    needs: release
-    if: ${{ !cancelled() && needs.release.result == 'success' }}
+  npm:
+    needs: publish
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
+    environment: npm
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      attestations: read
+      id-token: write
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.publish.outputs.tag }}
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '26'
+          package-manager-cache: false
+
+      - name: Publish verified package to npm
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          asset="m2rd-$version.tgz"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$asset"
+          gh attestation verify "$asset" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-ref refs/heads/main --source-digest "$GITHUB_SHA" --deny-self-hosted-runners
+          tar -xOf "$asset" package/package.json | jq -e --arg version "$version" \
+            '.name == "m2rd" and .version == $version and .bin.m2rd == "m2rd-cli.mjs"'
+          status=$(curl -sS -o metadata.json -w '%{http_code}' "https://registry.npmjs.org/m2rd/$version")
+          case "$status" in
+            404) npm publish "./$asset" --access public --provenance --ignore-scripts --registry=https://registry.npmjs.org ;;
+            200) test "$(jq -er .dist.integrity metadata.json)" = "sha512-$(openssl dgst -sha512 -binary "$asset" | openssl base64 -A)" ;;
+            *) echo "Registry lookup returned HTTP $status" >&2; exit 1 ;;
+          esac
+
+  tap:
+    needs: [publish, npm]
+    if: ${{ !cancelled() && needs.npm.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      attestations: read
+    env:
+      TAG: ${{ needs.publish.outputs.tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout Homebrew tap
@@ -96,6 +259,9 @@ jobs:
           VERSION="${TAG#v}"
           ASSET="m2rd-${VERSION}.tgz"
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET"
+          gh attestation verify "$ASSET" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-ref refs/heads/main --source-digest "$GITHUB_SHA" --deny-self-hosted-runners
           SHA="$(sha256sum "$ASSET" | cut -d' ' -f1)"
           rm "$ASSET"
           sed -i -E \
@@ -114,9 +280,28 @@ jobs:
             brews/m2rd.json
           base: main
           branch: m2rd
-          commit-message: 'm2rd ${{ inputs.tag || github.ref_name }}'
-          title: 'm2rd ${{ inputs.tag || github.ref_name }}'
+          commit-message: 'm2rd ${{ needs.publish.outputs.tag }}'
+          title: 'm2rd ${{ needs.publish.outputs.tag }}'
           body: |
             Update m2rd.
 
-            Release: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.tag || github.ref_name }}
+            Release: https://github.com/${{ github.repository }}/releases/tag/${{ needs.publish.outputs.tag }}
+
+  deploy:
+    needs: [checks, tap]
+    if: ${{ !cancelled() && needs.checks.result == 'success' && needs.tap.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128

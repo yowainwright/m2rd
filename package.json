@@ -1,5 +1,5 @@
 {
-  "name": "m2rd",
+  "name": "m2rd-root",
   "version": "0.0.19",
   "private": true,
   "description": "m2rd — Mermaid to React Diagrams",
@@ -14,21 +14,24 @@
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": ">=26 <27",
+      "version": ">=26.12.1 <27",
       "onFail": "error"
     }
   },
   "scripts": {
-    "cli": "node tmp/cli/m2rd-cli.mjs",
-    "preview:styleguide": "pnpm run cli:build && node tmp/cli/m2rd-cli.mjs --styleguide",
-    "cli:build": "rolldown --config scripts/cli/rolldown.config.ts",
-    "cli:pack": "node scripts/cli/index.ts",
+    "cli": "node packages/cli/dist/m2rd-cli.mjs",
+    "preview:styleguide": "pnpm run cli:build && node packages/cli/dist/m2rd-cli.mjs --styleguide",
+    "cli:build": "pnpm --filter m2rd run build",
+    "cli:pack": "pnpm --filter m2rd run pack",
     "dev": "printf '\\n  App: http://localhost:%s/m2rd/\\n\\n' \"${M2RD_APP_PORT:-54783}\" && next dev --port ${M2RD_APP_PORT:-54783}",
-    "server:build": "pnpm --filter @m2rd/server run build",
-    "server:start": "pnpm --filter @m2rd/server run start",
+    "server:build": "pnpm --filter m2rd-mcp run build",
+    "server:start": "pnpm --filter m2rd-mcp run start",
     "build": "next build --webpack",
     "preview": "mkdir -p .next/cache/pages && ln -sfn ../../../out .next/cache/pages/m2rd && python3 -m http.server ${M2RD_PREVIEW_PORT:-54784} --bind 127.0.0.1 --directory .next/cache/pages",
-    "release": "release-it patch",
+    "release": "pnpm run release:patch",
+    "release:patch": "gh workflow run release.yml --repo yowainwright/m2rd --ref main -f increment=patch",
+    "release:minor": "gh workflow run release.yml --repo yowainwright/m2rd --ref main -f increment=minor",
+    "release:major": "gh workflow run release.yml --repo yowainwright/m2rd --ref main -f increment=major",
     "release:dry": "release-it patch --dry-run",
     "deps:check": "codependence",
     "deps:overrides": "pastoralist",
@@ -40,19 +43,20 @@
     "lint:all": "pnpm run lint:fs && pnpm run lint:src && pnpm run lint:struct && pnpm run lint:oxlint && pnpm run lint:shell",
     "lint:ci": "pnpm run lint:fs && pnpm run lint:src && pnpm run lint:struct && pnpm run format:check && pnpm run lint:oxlint:strict && pnpm run lint:shell:ci",
     "lint:fs": "fs-lint check --root . --config scripts/.fs-lintrc --base \"${FS_LINT_BASE:-HEAD}\" && (git diff --no-renames --diff-filter=A --name-only -z HEAD && git ls-files --others --exclude-standard -z) | fs-lint check --root . --config scripts/.fs-lintrc --stdin0",
-    "lint:src": "git ls-files --cached --others --exclude-standard --deduplicate -z -- app tests scripts packages/server ':!:app/components/ui/**' | xargs -0 -n 1 sh -c 'test ! -f \"$1\" || src-lint check \"$1\"' sh",
-    "lint:struct": "struct-lint --profile ci app tests scripts packages/server",
-    "lint:oxlint": "oxlint -c scripts/oxlint.config.ts app tests scripts packages/server",
-    "lint:oxlint:strict": "oxlint -c scripts/oxlint.config.ts --deny-warnings app tests scripts packages/server",
+    "lint:src": "git ls-files --cached --others --exclude-standard --deduplicate -z -- app tests scripts packages ':!:app/components/ui/**' | xargs -0 -n 1 sh -c 'test ! -f \"$1\" || src-lint check \"$1\"' sh",
+    "lint:struct": "struct-lint --profile ci app tests scripts packages",
+    "lint:oxlint": "oxlint -c scripts/oxlint.config.ts app tests scripts packages",
+    "lint:oxlint:strict": "oxlint -c scripts/oxlint.config.ts --deny-warnings app tests scripts packages",
     "lint/run": "pnpm run lint:all",
     "lint/session": "pnpm run lint:fs && pnpm run lint:src && pnpm run lint:struct && pnpm run format:check && pnpm run lint:oxlint:strict && pnpm run lint:shell",
     "lint/session/all": "pnpm run lint/session",
     "lint/setup": "sh scripts/setup.sh --hooks-only",
     "lint:shell": "shfmt -d scripts/setup.sh && pnpm run lint:shell:ci && shellcheck-legibility check --config scripts/.shellcheck-legibility.toml scripts/setup.sh",
     "lint:shell:ci": "shellcheck -x -S warning scripts/setup.sh",
+    "mcp:build": "docker build --tag m2rd-shadcn:4.21.2 tests/integration/mcp",
     "mcp:generate": "node scripts/mcp/index.ts",
-    "mcp:check": "node \"$HOME/.agents/lib/mcp/client.js\" --config .agents/mcp/shadcn.json shadcn get_item_examples_from_registries '{\"registries\":[\"@shadcn\"],\"query\":\"resizable-demo\"}'",
-    "typecheck": "pnpm run typecheck:mcp && tsc --noEmit && pnpm --filter @m2rd/server run typecheck",
+    "mcp:check": "node scripts/mcp/index.ts && mcp-inspector --cli --config .agents/mcp/shadcn.json --server shadcn --method tools/list",
+    "typecheck": "pnpm run typecheck:mcp && tsc --noEmit && pnpm --filter m2rd-mcp run typecheck",
     "typecheck:mcp": "tsc --ignoreConfig --noEmit --module nodenext --target esnext --types node --allowImportingTsExtensions --skipLibCheck scripts/mcp/*.ts tests/unit/scripts/mcp/*.test.ts",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:e2e": "TMPDIR=.next/cache PLAYWRIGHT_LAST_RUN_OUTPUT_FILE=.next/cache/playwright/.last-run.json playwright test --config scripts/playwright.config.ts",
@@ -112,13 +116,11 @@
     "dexie": "4.4.7",
     "dompurify": "3.4.17",
     "effect": "^4.1.4",
-    "elkjs": "0.12.1",
     "gifenc": "^1.0.3",
     "html-to-image": "^1.11.13",
     "ink": "^8.0.0",
     "jsdom": "30.1.2",
     "lucide-react": "^1.73.0",
-    "marked": "18.2.0",
     "mermaid": "^12.3.0",
     "motion": "^14.14.0",
     "next": "^16.4.6",
@@ -129,12 +131,12 @@
     "reactflow": "^11.11.4",
     "shaders": "^4.0.7",
     "string-width": "9.0.0",
-    "svgdom": "0.1.29",
     "tailwind-merge": "^3.7.0",
     "xstate": "^5.33.4"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/inspector": "2.16.0",
     "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@testing-library/jest-dom": "^7.0.1",
@@ -143,7 +145,6 @@
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@types/svgdom": "0.1.2",
     "autoprefixer": "^10.6.2",
     "codependence": "^1.0.16",
     "fake-indexeddb": "^6.2.8",
@@ -155,7 +156,6 @@
     "postcss": "^8.5.33",
     "release-it": "21.1.2",
     "rolldown": "^1.3.2",
-    "rollup-plugin-license": "^3.7.2",
     "shadcn": "4.23.0",
     "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",
@@ -189,22 +189,24 @@
     "appendix": {
       "lodash-es@4.18.1": {
         "dependents": {
+          "m2rd-root": "lodash-es (required by mermaid)",
           "m2rd": "lodash-es (required by mermaid)",
-          "@m2rd/server": "lodash-es (required by mermaid)"
+          "m2rd-mcp": "lodash-es (required by mermaid)"
         },
         "ledger": {
-          "addedDate": "2026-10-05T20:00:21.493Z",
+          "addedDate": "2026-11-24T06:01:57.286Z",
           "reason": "Replace Mermaid/Chevrotain's vulnerable lodash-es pin for GHSA-r5fr-rjxr-66jc and GHSA-f23m-r3pf-42rh. Remove when upstream resolves a patched version without this override.",
           "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc"
         }
       },
       "undici@7.29.0@7.30.2": {
         "dependents": {
+          "m2rd-root": "undici@7.29.0 (transitive dependency)",
           "m2rd": "undici@7.29.0 (transitive dependency)",
-          "@m2rd/server": "undici@7.29.0 (transitive dependency)"
+          "m2rd-mcp": "undici@7.29.0 (transitive dependency)"
         },
         "ledger": {
-          "addedDate": "2026-09-30T05:27:17.253Z",
+          "addedDate": "2026-11-24T06:01:57.286Z",
           "reason": "Patch dotenvx's exact undici@7.29.0 dependency to 7.30.2 for the current Undici advisories. Remove when dotenvx updates its pin; scope this override to preserve other Undici versions.",
           "source": "security",
           "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
@@ -223,7 +225,7 @@
       },
       "basic-ftp@6.2.4": {
         "dependents": {
-          "m2rd": "basic-ftp (required by release-it)"
+          "m2rd-root": "basic-ftp (required by release-it)"
         },
         "ledger": {
           "addedDate": "2026-11-14T07:34:20.588Z",
@@ -260,11 +262,12 @@
       },
       "source-map-js@1.2.2": {
         "dependents": {
-          "m2rd": "source-map-js (required by @better-auth/oauth-provider, @tailwindcss/postcss, @testing-library/jest-dom)",
-          "@m2rd/server": "source-map-js (required by @better-auth/cimd, @better-auth/mcp, @better-auth/oauth-provider)"
+          "m2rd-root": "source-map-js (required by @better-auth/oauth-provider, @modelcontextprotocol/inspector, @tailwindcss/postcss)",
+          "m2rd": "source-map-js (required by jsdom)",
+          "m2rd-mcp": "source-map-js (required by @better-auth/cimd, @better-auth/mcp, @better-auth/oauth-provider)"
         },
         "ledger": {
-          "addedDate": "2026-10-06T01:02:24.934Z",
+          "addedDate": "2026-11-24T06:01:57.286Z",
           "reason": "Security fix: source-map-js allows event-loop denial of service through indexed source-map section offsets (high)",
           "source": "security",
           "securityChecked": true,
@@ -292,11 +295,12 @@
       },
       "katex@0.19.0": {
         "dependents": {
+          "m2rd-root": "katex (required by mermaid)",
           "m2rd": "katex (required by mermaid)",
-          "@m2rd/server": "katex (required by mermaid)"
+          "m2rd-mcp": "katex (required by mermaid)"
         },
         "ledger": {
-          "addedDate": "2026-10-06T01:02:24.934Z",
+          "addedDate": "2026-11-24T06:01:57.286Z",
           "reason": "Security fix: KaTeX: Existing prototype pollution can bypass trust restrictions (low)",
           "source": "security",
           "securityChecked": true,
@@ -324,7 +328,7 @@
       },
       "minimatch@11.0.1": {
         "dependents": {
-          "m2rd": "minimatch (required by shadcn)"
+          "m2rd-root": "minimatch (required by shadcn)"
         },
         "ledger": {
           "addedDate": "2026-11-14T07:34:20.588Z",

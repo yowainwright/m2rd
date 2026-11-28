@@ -3,7 +3,7 @@ import type { Viewport } from 'reactflow';
 import { APP_INITIAL_CONTEXT, SAVE_FEEDBACK_MS } from '@/app/constants';
 import { EMPTY_GRAPH_NAME_ERROR, LEGACY_UNTITLED_GRAPH_NAME } from '@/app/graph/constants';
 import type {
-  AccountSnapshot,
+  AccountSnapshotPage,
   AppContext as AppMachineContext,
   AppEvent,
   LoadedWorkspace,
@@ -14,7 +14,7 @@ import type { SavedWorkspace } from './types';
 import { runOperation } from '@/app/lib/effect';
 import {
   authClient,
-  authorizeRemoteDraft,
+  openWorkspaceSignIn,
   discardRemoteDraft,
   copyRemoteLink,
   listRemoteSnapshots,
@@ -67,8 +67,13 @@ const actorSetup = setup({
       },
     ),
     authorizeRemote: fromPromise(
-      ({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
-        runOperation(authorizeRemoteDraft(input), signal),
+      ({
+        input,
+        signal,
+      }: {
+        input: { context: AppMachineContext; resumeSave: boolean };
+        signal: AbortSignal;
+      }) => runOperation(openWorkspaceSignIn(input.context, input.resumeSave), signal),
     ),
     discardRemote: fromPromise(
       ({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
@@ -83,7 +88,10 @@ const actorSetup = setup({
       if (!input.remote) return Promise.resolve();
       return copyRemoteLink(input.remote);
     }),
-    listRemote: fromPromise(listRemoteSnapshots),
+    listRemote: fromPromise(
+      ({ input, signal }: { input: AppMachineContext; signal: AbortSignal }) =>
+        listRemoteSnapshots(input.nextSnapshotPage ?? 1, input.remoteAccount, signal),
+    ),
     initialize: fromPromise<LoadedWorkspace>(({ signal }) =>
       runOperation(loadInitialWorkspace(), signal),
     ),
@@ -191,7 +199,7 @@ const documentSetup = layoutSetup.extend({
       if (output.resumePending) enqueue.raise({ type: 'remote.resume' });
     }),
     requestRemoteSignIn: enqueueActions(({ enqueue }) => {
-      enqueue.raise({ type: 'remote.authorize' });
+      enqueue.raise({ type: 'remote.authorize', resumeSave: true });
     }),
     acceptRemoteDraft: assign(({ context }, output: CaptureOutput) => ({
       ...acceptSavedWorkspace(context, output.records),
@@ -213,11 +221,28 @@ const documentSetup = layoutSetup.extend({
     }),
     clearRemoteError: assign({ remoteError: null }),
     clearRemoteDraft: assign({ remoteDraft: null, remoteError: null }),
-    acceptRemoteAccount: assign((_, id: string | null) => ({ remoteAccount: id })),
-    clearRemoteAccount: assign({ remoteAccount: null, accountSnapshots: [] }),
-    acceptAccountSnapshots: assign((_, accountSnapshots: AccountSnapshot[]) => ({
-      accountSnapshots,
-    })),
+    acceptRemoteAccount: assign(({ context }, id: string | null) => {
+      if (id === context.remoteAccount) return {};
+      return { remoteAccount: id, accountSnapshots: [], nextSnapshotPage: null };
+    }),
+    clearRemoteAccount: assign({
+      remoteAccount: null,
+      accountSnapshots: [],
+      nextSnapshotPage: null,
+    }),
+    acceptAccountSnapshots: assign(({ context }, result: AccountSnapshotPage) => {
+      const continuing = result.page > 1 && result.accountId === context.remoteAccount;
+      const previous = continuing ? context.accountSnapshots : [];
+      const byGist = new Map(previous.map((snapshot) => [snapshot.gistId, snapshot]));
+      result.snapshots.forEach((snapshot) => {
+        byGist.set(snapshot.gistId, snapshot);
+      });
+      return {
+        remoteAccount: result.accountId,
+        accountSnapshots: Array.from(byGist.values()),
+        nextSnapshotPage: result.nextPage,
+      };
+    }),
     restoreInitialWorkspace: assign(
       ({ context }, { records, workspaces, shared, pending, sharedError }: LoadedWorkspace) => {
         if (!records) return { workspaces, viewportHistory: [], viewportForwardHistory: [] };

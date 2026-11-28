@@ -61,6 +61,8 @@ export function WorkspaceSidebar() {
 function RemoteGraphs() {
   const { send } = AppContext.useActorRef();
   const account = AppContext.useSelector((state) => state.context.remoteAccount);
+  const nextPage = AppContext.useSelector((state) => state.context.nextSnapshotPage);
+  const listLabel = nextPage ? 'Load more GitHub snapshots' : 'Find my GitHub snapshots';
   const current = AppContext.useSelector((state) => state.context.remote);
   const original = current?.forkedFrom;
   const originalUrl = original ? formatSnapshotLink(original) : null;
@@ -87,7 +89,7 @@ function RemoteGraphs() {
         {account && (
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => send({ type: 'remote.list' })}>
-              Find my GitHub snapshots
+              {listLabel}
             </SidebarMenuButton>
           </SidebarMenuItem>
         )}

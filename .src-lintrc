@@ -2,9 +2,10 @@
   "version": 1,
   "strict": true,
   "boundaries": {
-    "app": { "root": "app" },
-    "tests": { "root": "tests", "allow": ["app/**", "scripts/**", "packages/server/**"] },
-    "server": { "root": "packages/server", "allow": ["app/graph/snapshot/**", "app/graph/types.ts", "app/graph/constants.ts", "app/graph/render/index.ts", "app/lib/cli/utils.ts", "app/lib/cli/types.ts"] },
+    "app": { "root": "app", "allow": ["packages/cli/src/themes/constants.ts"] },
+    "tests": { "root": "tests", "allow": ["app/**", "scripts/**", "packages/server/**", "packages/cli/**"] },
+    "cli": { "root": "packages/cli", "allow": ["app/components/ui/**", "app/graph/state/constants.ts", "app/hooks/useUnicode.ts"] },
+    "server": { "root": "packages/server", "allow": ["app/graph/snapshot/**", "app/graph/types.ts", "app/graph/constants.ts", "app/graph/render/index.ts", "packages/cli/src/utils.ts", "packages/cli/src/types.ts"] },
     "scripts": { "root": "scripts" }
   }
 }

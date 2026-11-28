@@ -13,7 +13,7 @@ import {
   readRemoteSnapshot,
   rememberRemoteSnapshot,
 } from '@/app/graph/repository';
-import type { AccountSnapshot, RemoteDraft, SharedSnapshot } from '@/app/types';
+import type { AccountSnapshotPage, RemoteDraft, SharedSnapshot } from '@/app/types';
 import { initializeBrowserRenderer, renderGraph } from '@/app/graph/render';
 import { Effect, Semaphore } from 'effect';
 import { applyEdgeChanges, applyNodeChanges } from 'reactflow';
@@ -131,18 +131,19 @@ export const discardRemoteDraft = (draft: RemoteDraft | null) =>
     catch: storageError,
   });
 
-export const authorizeRemoteDraft = (context: AppContext) =>
+export const openWorkspaceSignIn = (context: AppContext, resumeSave: boolean) =>
   Effect.gen(function* () {
     const draft = context.remoteDraft;
-    if (!draft) return yield* Effect.fail(new Error('There is no remote save to continue.'));
+    const missingDraft = resumeSave && !draft;
+    if (missingDraft) return yield* Effect.fail(new Error('There is no remote save to continue.'));
     let current = context;
     if (context.needsRender) {
       const rendered = yield* renderWorkspace(context);
       current = Object.assign({}, context, acceptRenderedElements(context, rendered));
     }
     yield* saveWorkspace(current);
-    const returnTo = encodeURIComponent(`/m2rd/?save=${draft.saveId}`);
-    window.location.assign(`/m2rd/sign-in/?returnTo=${returnTo}`);
+    const path = resumeSave && draft ? `/m2rd/?save=${draft.saveId}` : '/m2rd/';
+    window.location.assign(`/m2rd/sign-in/?returnTo=${encodeURIComponent(path)}`);
   });
 
 export const copyRemoteLink = async (snapshot: SharedSnapshot) => {
@@ -160,10 +161,26 @@ export const readRemoteAccount = async () => {
   return result.data?.user.id ?? null;
 };
 
-export const listRemoteSnapshots = async (): Promise<AccountSnapshot[]> => {
-  const response = await fetch(`${apiOrigin}/api/snapshots`, { credentials: 'include' });
+export const listRemoteSnapshots = async (
+  requestedPage: number,
+  expectedAccount: string | null,
+  signal: AbortSignal,
+): Promise<AccountSnapshotPage> => {
+  const url = new URL('/api/snapshots', apiOrigin);
+  const continuation = requestedPage > 1 && expectedAccount;
+  if (continuation) {
+    url.searchParams.set('page', String(requestedPage));
+    url.searchParams.set('account', expectedAccount);
+  }
+  const response = await fetch(url, { credentials: 'include', signal });
+  if (response.status === 401) return { accountId: null, snapshots: [], page: 1, nextPage: null };
   if (!response.ok) throw new Error('Saved graphs are unavailable.');
-  return response.json();
+  const accountId = response.headers.get('M2rd-Account-Id');
+  if (!accountId) throw new Error('Could not identify the account for these saved graphs.');
+  const page = expectedAccount === accountId ? requestedPage : 1;
+  const snapshots = await response.json();
+  const nextPage = response.headers.has('Link') ? page + 1 : null;
+  return { accountId, snapshots, page, nextPage };
 };
 
 export const loadWorkspace = (request: WorkspaceRequest | null) =>

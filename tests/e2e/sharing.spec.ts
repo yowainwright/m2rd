@@ -38,6 +38,40 @@ test('saves a guest edit through sign-in and forks a later edit in a separate br
   }
 });
 
+test('keeps snapshot pages within the active account when the session changes', async ({
+  page,
+}) => {
+  await stubGitHub(page, 905);
+  await page.goto('./');
+  await replaceMermaid(page, 'Paged list');
+  const signIn = page.getByRole('button', { name: 'Sign in', exact: true });
+  await signIn.click();
+  await expect(page.getByRole('link', { name: 'Back to the editor' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue with GitHub' }).click();
+  await expect(page.locator('.cm-content')).toContainText('Paged list');
+  await expect(signIn).toHaveCount(0);
+  const list = `${getFixtureApi()}/api/snapshots`;
+  await stubAccountSwitch(page, list);
+  const find = page.getByRole('button', { name: 'Find my GitHub snapshots' });
+  if (!(await find.isVisible())) await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
+  await find.click();
+  await page.getByRole('button', { name: 'Load more GitHub snapshots' }).click();
+  await expect(page.getByRole('link', { name: 'First page graph' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Second page graph' })).toBeVisible();
+  const more = page.getByRole('button', { name: 'Load more GitHub snapshots' });
+  await more.click();
+  await expect(page.getByRole('link', { name: 'New account graph' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'First page graph' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Second page graph' })).toHaveCount(0);
+  await more.click();
+  await expect(page.getByRole('link', { name: 'New account second page' })).toBeVisible();
+  await expect(find).toBeVisible();
+  await page.route(list, (route) => route.fulfill({ status: 401 }));
+  await find.click();
+  await expect(page.getByRole('link', { name: 'New account graph' })).toHaveCount(0);
+  await expect(find).toHaveCount(0);
+});
+
 test('keeps newer edits through a delayed unauthorized save and sign-in', async ({ page }) => {
   await stubGitHub(page, 903);
   await page.goto('./');
@@ -157,6 +191,47 @@ const expectCapturedColor = async (page: Page, link: string) => {
   expect(response.ok()).toBe(true);
   const { snapshot } = await response.json();
   expect(snapshot.svg.text).toContain('rgb(239, 68, 68)');
+};
+
+const stubAccountSwitch = async (page: Page, list: string) => {
+  await stubSnapshotPage(page, list, {
+    owner: 'first',
+    gistId: 'a',
+    title: 'First page graph',
+    next: 2,
+  });
+  await stubSnapshotPage(page, list + '?page=2&account=first', {
+    owner: 'first',
+    gistId: 'b',
+    title: 'Second page graph',
+    next: 3,
+  });
+  await stubSnapshotPage(page, list + '?page=3&account=first', {
+    owner: 'second',
+    gistId: 'c',
+    title: 'New account graph',
+    next: 2,
+  });
+  await stubSnapshotPage(page, list + '?page=2&account=second', {
+    owner: 'second',
+    gistId: 'd',
+    title: 'New account second page',
+  });
+};
+
+const stubSnapshotPage = (
+  page: Page,
+  url: string,
+  { owner, gistId, title, next }: { owner: string; gistId: string; title: string; next?: number },
+) => {
+  const revision = 'a'.repeat(40);
+  const json = [{ gistId, revision, title, url: `/m2rd/${gistId}-${revision}` }];
+  const headers = new Headers({
+    'M2rd-Account-Id': owner,
+    'Access-Control-Expose-Headers': 'Link, M2rd-Account-Id',
+  });
+  if (next) headers.set('Link', `</api/snapshots?page=${next}&account=${owner}>; rel="next"`);
+  return page.route(url, (route) => route.fulfill({ json, headers: Object.fromEntries(headers) }));
 };
 
 const replaceMermaid = async (page: Page, label: string) => {

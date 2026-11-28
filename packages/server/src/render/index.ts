@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { DEFAULT_SETTINGS } from '@/app/graph/constants';
 import { renderGraph } from '@/app/graph/render';
-import { initializeMermaid, renderDiagram, renderSvgSource } from '@/app/lib/cli/utils';
+import { initializeMermaid, renderDiagram, renderSvgSource } from '@/packages/cli/src/utils';
 import { renderJob, type RenderJob } from '../mcp/types';
 
 const maxTextBytes = 1_048_576;

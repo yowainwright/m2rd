@@ -4,7 +4,7 @@ import { JSDOM } from 'jsdom';
 import { beforeAll, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '@/app/graph/constants';
 import { encodeSnapshot } from '@/app/graph/snapshot';
-import { renderDiagram } from '@/app/lib/cli/utils';
+import { renderDiagram } from '@/packages/cli/src/utils';
 
 const renderEntry = 'packages/server/dist/render.mjs';
 const timestamp = '2026-11-17T00:00:00.000Z';

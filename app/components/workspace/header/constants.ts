@@ -9,7 +9,7 @@ export const HEADER_LABELS = {
   title: 'm2rd',
   sidebar: 'Toggle saved graphs',
   repository: 'GitHub repository',
-  create: 'New',
+  diagramType: 'Change diagram type',
   delete: 'Delete',
   download: 'Download',
   graphNameAndSave: 'Graph name and save',

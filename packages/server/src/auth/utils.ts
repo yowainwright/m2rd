@@ -5,7 +5,9 @@ import type { ClientMetadataResourceFetch } from '@better-auth/oauth-provider';
 import { Address4, Address6 } from 'ip-address';
 import Database from 'better-sqlite3';
 import { Effect } from 'effect';
-import type { UsageLimit } from './types';
+import { APIError } from 'better-auth/api';
+import type { createAuth } from './index';
+import type { UsageLimit, VerifiedAccount } from './types';
 
 export class AdmissionError extends Error {
   readonly status = 429;
@@ -15,6 +17,19 @@ const minuteMs = 60_000;
 const dayMs = 86_400_000;
 const minuteLimit = 10;
 const dayLimit = 100;
+
+export const assertLiveAccount = async (
+  server: ReturnType<typeof createAuth>,
+  account: VerifiedAccount,
+) => {
+  const { adapter } = await server.$context;
+  const session = await adapter.findOne<{ userId: string; expiresAt: Date }>({
+    model: 'session',
+    where: [{ field: 'id', value: account.sessionId }],
+  });
+  const active = session?.userId === account.id && session.expiresAt.getTime() > Date.now();
+  if (!active) throw new APIError('UNAUTHORIZED', { message: 'Sign in again.' });
+};
 
 export const openDatabase = (path: string) => {
   const database = new Database(path);

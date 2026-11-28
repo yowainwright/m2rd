@@ -4,10 +4,10 @@ import { Readable } from 'node:stream';
 import { Effect } from 'effect';
 import { JSDOM } from 'jsdom';
 import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { runCli } from '@/app/lib/cli/utils';
-import { showViewer } from '@/app/lib/cli/viewer';
+import { runCli } from '@/packages/cli/src/utils';
+import { showViewer } from '@/packages/cli/src/viewer';
 
-vi.mock('@/app/lib/cli/viewer', () => ({ showViewer: vi.fn() }));
+vi.mock('@/packages/cli/src/viewer', () => ({ showViewer: vi.fn() }));
 
 const temporaryRoot = resolve(import.meta.dirname, '../../../tmp');
 mkdirSync(temporaryRoot, { recursive: true });

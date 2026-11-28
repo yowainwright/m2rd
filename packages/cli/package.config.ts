@@ -13,7 +13,7 @@ export const packageConfig = (
   runtimeAssets: Plugin,
   worker: string,
 ): BuildOptions => {
-  const entry = resolve(import.meta.dirname, '../../app/lib/cli/index.ts');
+  const entry = resolve(import.meta.dirname, 'src/index.ts');
   const notices = resolve(directory, 'THIRD_PARTY_LICENSES.txt');
   const licenses = license({ thirdParty: { output: notices, multipleVersions: true } });
   const output = outputOptions(directory);

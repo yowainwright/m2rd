@@ -1,6 +1,7 @@
 type Files = Record<string, { content: string }>;
 type Gist = {
   id: string;
+  public: boolean;
   description: string;
   owner: { id: number };
   files: Files;
@@ -53,7 +54,7 @@ const handleCollection = async (
   if (body.public !== false) return Response.json({}, { status: 422 });
   const id = (gists.size + 10).toString(16);
   const { files, description } = body;
-  const gist = { id, description, owner: { id: owner }, files, history: [] };
+  const gist = { id, public: false, description, owner: { id: owner }, files, history: [] };
   gists.set(id, gist);
   return Response.json(saveRevision(gist, revisions), { status: 201 });
 };

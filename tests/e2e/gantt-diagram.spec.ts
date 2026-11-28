@@ -11,7 +11,7 @@ const updateSource = async (page: Page, source: string) => {
 
 const chooseGantt = async (page: Page) => {
   await page.goto('./');
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('button', { name: /^Change diagram type:/ }).click();
   await page.getByRole('menuitem', { name: 'Gantt chart', exact: true }).click();
   await expect(page.locator('[data-gantt-task]')).toHaveCount(4);
 };
